@@ -3,12 +3,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Report } from './components/Report';
 import { InsertForm } from './components/InsertForm';
 import { StaffRecord } from './types';
-import { Plus, Printer, FileText, Trash2, Edit, List } from 'lucide-react';
+import { Plus, Printer, FileText, Trash2, Edit, List, LogIn, LogOut, User as UserIcon } from 'lucide-react';
 import ReactDOM from 'react-dom/client';
+import { auth, db, loginWithGoogle, logout, onAuthStateChanged, User } from './firebase';
+import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 
 declare var html2pdf: any;
 
 const App: React.FC = () => {
+    const [user, setUser] = useState<User | null>(null);
+    const [isAuthReady, setIsAuthReady] = useState(false);
     const [allRecords, setAllRecords] = useState<StaffRecord[]>([]);
     const [selectedStaffId, setSelectedStaffId] = useState<string>('');
     const [view, setView] = useState<'list' | 'insert' | 'report'>('list');
@@ -19,41 +23,78 @@ const App: React.FC = () => {
     const reportContainerRef = useRef<HTMLDivElement>(null);
     const allReportsRef = useRef<HTMLDivElement>(null);
 
-    // Load data from localStorage on mount
+    // Auth listener
     useEffect(() => {
-        const saved = localStorage.getItem('staff_records');
-        if (saved) {
-            try {
-                setAllRecords(JSON.parse(saved));
-            } catch (e) {
-                console.error('Failed to load records from localStorage', e);
-            }
-        }
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            setIsAuthReady(true);
+        });
+        return () => unsubscribe();
     }, []);
 
-    // Save data to localStorage whenever allRecords changes
+    // Firestore listener
     useEffect(() => {
-        localStorage.setItem('staff_records', JSON.stringify(allRecords));
-    }, [allRecords]);
-
-    const handleSaveRecord = (record: StaffRecord) => {
-        if (editingRecord) {
-            setAllRecords(allRecords.map(r => r.id === record.id ? record : r));
-            setMessage('تم تحديث البيانات بنجاح');
-        } else {
-            setAllRecords([...allRecords, record]);
-            setMessage('تم حفظ البيانات بنجاح');
+        if (!user) {
+            setAllRecords([]);
+            return;
         }
-        setEditingRecord(undefined);
-        setView('list');
-        setTimeout(() => setMessage(''), 3000);
+
+        const q = query(collection(db, 'staff_records'), where('uid', '==', user.uid));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const records: StaffRecord[] = [];
+            snapshot.forEach((doc) => {
+                records.push(doc.data() as StaffRecord);
+            });
+            setAllRecords(records);
+        }, (error) => {
+            console.error("Firestore Error:", error);
+            setMessage('خطأ في تحميل البيانات من قاعدة البيانات');
+        });
+
+        return () => unsubscribe();
+    }, [user]);
+
+    const handleSaveRecord = async (record: StaffRecord) => {
+        if (!user) {
+            setMessage('يجب تسجيل الدخول لحفظ البيانات');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const recordWithUid = { 
+                ...record, 
+                uid: user.uid,
+                createdAt: editingRecord ? (editingRecord as any).createdAt : serverTimestamp()
+            };
+            await setDoc(doc(db, 'staff_records', record.id), recordWithUid);
+            setMessage(editingRecord ? 'تم تحديث البيانات بنجاح' : 'تم حفظ البيانات بنجاح');
+            setEditingRecord(undefined);
+            setView('list');
+        } catch (error) {
+            console.error("Save Error:", error);
+            setMessage('فشل في حفظ البيانات في قاعدة البيانات');
+        } finally {
+            setIsLoading(false);
+            setTimeout(() => setMessage(''), 3000);
+        }
     };
 
-    const handleDeleteRecord = (id: string) => {
-        setAllRecords(allRecords.filter(r => r.id !== id));
-        if (selectedStaffId === id) setSelectedStaffId('');
-        setMessage('تم حذف السجل بنجاح');
-        setTimeout(() => setMessage(''), 3000);
+    const handleDeleteRecord = async (id: string) => {
+        if (!user) return;
+        
+        setIsLoading(true);
+        try {
+            await deleteDoc(doc(db, 'staff_records', id));
+            if (selectedStaffId === id) setSelectedStaffId('');
+            setMessage('تم حذف السجل بنجاح');
+        } catch (error) {
+            console.error("Delete Error:", error);
+            setMessage('فشل في حذف السجل');
+        } finally {
+            setIsLoading(false);
+            setTimeout(() => setMessage(''), 3000);
+        }
     };
 
     const handleEditRecord = (record: StaffRecord) => {
@@ -191,11 +232,49 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            <header className="bg-blue-600 text-white p-4 rounded-xl shadow-lg mb-8 text-center">
-                <h1 className="text-xl sm:text-2xl font-bold">
-                    Developed by Dr. Mazen Badawy – Doctorate of English Teaching & Testing
-                </h1>
+            <header className="bg-blue-600 text-white p-4 rounded-xl shadow-lg mb-8">
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <h1 className="text-xl sm:text-2xl font-bold text-center sm:text-right">
+                        Developed by Dr. Mazen Badawy – Doctorate of English Teaching & Testing
+                    </h1>
+                    <div className="flex items-center gap-3">
+                        {user ? (
+                            <div className="flex items-center gap-3 bg-blue-700 px-4 py-2 rounded-lg">
+                                <div className="text-right hidden sm:block">
+                                    <p className="text-xs opacity-75">مرحباً بك</p>
+                                    <p className="text-sm font-bold">{user.displayName || user.email}</p>
+                                </div>
+                                {user.photoURL ? (
+                                    <img src={user.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-white/20" referrerPolicy="no-referrer" />
+                                ) : (
+                                    <UserIcon size={20} />
+                                )}
+                                <button 
+                                    onClick={logout}
+                                    className="p-2 hover:bg-red-500 rounded-full transition-colors"
+                                    title="تسجيل الخروج"
+                                >
+                                    <LogOut size={18} />
+                                </button>
+                            </div>
+                        ) : (
+                            <button 
+                                onClick={loginWithGoogle}
+                                className="flex items-center gap-2 bg-white text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-50 transition-all shadow-md"
+                            >
+                                <LogIn size={20} /> تسجيل الدخول (Google)
+                            </button>
+                        )}
+                    </div>
+                </div>
             </header>
+
+            {!user && isAuthReady && (
+                <div className="bg-amber-50 border-r-4 border-amber-500 p-6 rounded-xl shadow-md mb-8 text-center">
+                    <h2 className="text-xl font-bold text-amber-800 mb-2">يرجى تسجيل الدخول لحفظ بياناتك</h2>
+                    <p className="text-amber-700">عند تسجيل الدخول، سيتم حفظ جميع سجلاتك في قاعدة بيانات سحابية آمنة لتتمكن من الوصول إليها من أي مكان.</p>
+                </div>
+            )}
 
             <main className="max-w-5xl mx-auto">
                 <div className="flex flex-wrap gap-4 mb-8 justify-center">

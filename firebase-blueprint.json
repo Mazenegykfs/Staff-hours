@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "StaffRecord": {
+      "title": "Staff Record",
+      "description": "Information about a faculty member and their teaching schedule.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string", "description": "The user ID of the owner." },
+        "name": { "type": "string" },
+        "degree": { "type": "string" },
+        "department": { "type": "string" },
+        "employer": { "type": "string" },
+        "weeklySchedule": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "day": { "type": "string" },
+              "theoretical": { "type": "number" },
+              "practical": { "type": "number" }
+            }
+          }
+        },
+        "attendanceDates": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "uid", "name", "weeklySchedule", "attendanceDates"]
+    }
+  },
+  "firestore": {
+    "/staff_records/{recordId}": {
+      "schema": "StaffRecord",
+      "description": "Collection of teaching staff records."
+    }
+  }
+}
