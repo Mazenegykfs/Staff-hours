@@ -1,0 +1,5 @@
+{
+  "name": "Dynamic Teaching Hours Report Generator",
+  "description": "An application to upload an XLSX file of teaching hours, view dynamic reports for each faculty member, and generate individual or bulk PDF reports.",
+  "requestFramePermissions": []
+}
