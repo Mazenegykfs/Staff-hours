@@ -81,7 +81,7 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
             return;
         }
         const record: StaffRecord = {
-            id: initialData?.id || crypto.randomUUID(),
+            id: initialData?.id || '',
             name,
             degree,
             department,
@@ -203,9 +203,9 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
                         <DatePicker
                             multiple
                             value={attendanceDates}
-                            onChange={(dateObjects: DateObject[]) => {
+                            onChange={(dateObjects: DateObject[] | null) => {
                                 setError('');
-                                setAttendanceDates(dateObjects.map(d => d.format("YYYY-MM-DD")));
+                                setAttendanceDates(dateObjects ? dateObjects.map(d => d.format("YYYY-MM-DD")) : []);
                             }}
                             format="YYYY-MM-DD"
                             minDate={minDate}

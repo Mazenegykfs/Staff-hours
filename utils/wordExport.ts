@@ -277,11 +277,15 @@ const generateReportChildren = (record: StaffRecord, deanName: string, clerkName
                     children: [
                         new TableCell({
                             children: [
-                                new Paragraph({ children: [new TextRun({ text: "عميد المعهد", bold: true, rightToLeft: true, font: "Arial", size: 22 })], alignment: AlignmentType.RIGHT, bidirectional: true }),
+                                new Paragraph({ children: [new TextRun({ text: "عميد المعهد", bold: true, rightToLeft: true, font: "Arial", size: 22 })], alignment: AlignmentType.CENTER, bidirectional: true }),
                                 new Paragraph({ text: "", spacing: { after: 400 } }),
-                                new Paragraph({ children: [new TextRun({ text: deanName, bold: true, rightToLeft: true, font: "Arial", size: 22 })], alignment: AlignmentType.RIGHT, bidirectional: true }),
+                                new Paragraph({ children: [new TextRun({ text: deanName, bold: true, rightToLeft: true, font: "Arial", size: 22 })], alignment: AlignmentType.CENTER, bidirectional: true }),
                             ],
-                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            width: { size: 33, type: WidthType.PERCENTAGE },
+                        }),
+                        new TableCell({
+                            children: [],
+                            width: { size: 67, type: WidthType.PERCENTAGE },
                         }),
                     ],
                 }),

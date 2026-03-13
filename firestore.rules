@@ -50,6 +50,9 @@ service cloud.firestore {
     function isValidStaffRecord(data) {
       return data.keys().hasOnly(['id', 'uid', 'name', 'degree', 'department', 'employer', 'weeklySchedule', 'attendanceDates', 'createdAt']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             (!('degree' in data) || data.degree is string) &&
+             (!('department' in data) || data.department is string) &&
+             (!('employer' in data) || data.employer is string) &&
              data.weeklySchedule is list && data.weeklySchedule.size() <= 7 &&
              data.attendanceDates is list && data.attendanceDates.size() <= 100;
     }

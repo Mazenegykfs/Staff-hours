@@ -11,6 +11,57 @@ import { exportToDocx, exportAllToDocx } from './utils/wordExport';
 
 declare var html2pdf: any;
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 const PrintableReport = ({ record }: { record: StaffRecord }) => {
     const [scale, setScale] = useState(1);
     const [wrapperHeight, setWrapperHeight] = useState<number | 'auto'>('auto');
@@ -82,7 +133,12 @@ const App: React.FC = () => {
     // Auth listener
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
+            setUser((prevUser) => {
+                if (prevUser && !currentUser) {
+                    setMessage('تم تسجيل الخروج تلقائياً (قد يكون بسبب انتهاء الجلسة أو حظر ملفات تعريف الارتباط للجهات الخارجية). يرجى تسجيل الدخول مرة أخرى.');
+                }
+                return currentUser;
+            });
             setIsAuthReady(true);
         });
         return () => unsubscribe();
@@ -103,8 +159,11 @@ const App: React.FC = () => {
             });
             setAllRecords(records);
         }, (error) => {
-            console.error("Firestore Error:", error);
-            setMessage('خطأ في تحميل البيانات من قاعدة البيانات');
+            try {
+                handleFirestoreError(error, OperationType.LIST, 'staff_records');
+            } catch (e) {
+                setMessage('خطأ في تحميل البيانات من قاعدة البيانات');
+            }
         });
 
         return () => unsubscribe();
@@ -117,19 +176,28 @@ const App: React.FC = () => {
         }
 
         setIsLoading(true);
+        const docId = record.id || doc(collection(db, 'staff_records')).id;
         try {
-            const recordWithUid = { 
+            const recordWithUid: StaffRecord = { 
                 ...record, 
+                id: docId,
                 uid: user.uid,
-                createdAt: editingRecord ? (editingRecord as any).createdAt : serverTimestamp()
             };
-            await setDoc(doc(db, 'staff_records', record.id), recordWithUid);
+            if (editingRecord && editingRecord.createdAt) {
+                recordWithUid.createdAt = editingRecord.createdAt;
+            } else {
+                recordWithUid.createdAt = serverTimestamp();
+            }
+            await setDoc(doc(db, 'staff_records', docId), recordWithUid);
             setMessage(editingRecord ? 'تم تحديث البيانات بنجاح' : 'تم حفظ البيانات بنجاح');
             setEditingRecord(undefined);
             setView('list');
         } catch (error) {
-            console.error("Save Error:", error);
-            setMessage('فشل في حفظ البيانات في قاعدة البيانات');
+            try {
+                handleFirestoreError(error, editingRecord ? OperationType.UPDATE : OperationType.CREATE, `staff_records/${docId}`);
+            } catch (e) {
+                setMessage('فشل في حفظ البيانات في قاعدة البيانات');
+            }
         } finally {
             setIsLoading(false);
             setTimeout(() => setMessage(''), 3000);
@@ -145,8 +213,11 @@ const App: React.FC = () => {
             if (selectedStaffId === id) setSelectedStaffId('');
             setMessage('تم حذف السجل بنجاح');
         } catch (error) {
-            console.error("Delete Error:", error);
-            setMessage('فشل في حذف السجل');
+            try {
+                handleFirestoreError(error, OperationType.DELETE, `staff_records/${id}`);
+            } catch (e) {
+                setMessage('فشل في حذف السجل');
+            }
         } finally {
             setIsLoading(false);
             setTimeout(() => setMessage(''), 3000);
@@ -463,7 +534,8 @@ const App: React.FC = () => {
             {!user && isAuthReady && (
                 <div className="bg-amber-50 border-r-4 border-amber-500 p-6 rounded-xl shadow-md mb-8 text-center">
                     <h2 className="text-xl font-bold text-amber-800 mb-2">يرجى تسجيل الدخول لحفظ بياناتك</h2>
-                    <p className="text-amber-700">عند تسجيل الدخول، سيتم حفظ جميع سجلاتك في قاعدة بيانات سحابية آمنة لتتمكن من الوصول إليها من أي مكان.</p>
+                    <p className="text-amber-700 mb-2">عند تسجيل الدخول، سيتم حفظ جميع سجلاتك في قاعدة بيانات سحابية آمنة لتتمكن من الوصول إليها من أي مكان.</p>
+                    <p className="text-sm text-amber-600 bg-amber-100 p-2 rounded">ملاحظة: إذا واجهت مشكلة تسجيل الخروج المفاجئ، يرجى فتح التطبيق في علامة تبويب جديدة (New Tab) لتجنب حظر ملفات تعريف الارتباط للجهات الخارجية.</p>
                 </div>
             )}
 
@@ -507,8 +579,12 @@ const App: React.FC = () => {
 
                 {view === 'insert' && (
                     <InsertForm
+                        key={editingRecord ? editingRecord.id : 'new'}
                         onSave={handleSaveRecord}
-                        onCancel={() => setView('list')}
+                        onCancel={() => {
+                            setView('list');
+                            setEditingRecord(undefined);
+                        }}
                         initialData={editingRecord}
                     />
                 )}

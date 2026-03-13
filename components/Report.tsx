@@ -55,9 +55,9 @@ export const Report: React.FC<ReportProps> = ({ recordData }) => {
 
 
     return (
-        <div className="bg-white p-2 sm:p-4 pb-12 sm:pb-16 rounded-xl shadow-lg my-2 max-w-4xl mx-auto report-container-for-print text-[10px] sm:text-[11px] leading-[1.1]">
-            <header className="mb-1">
-                <table className="w-full border-none mb-1 word-table-layout">
+        <div className="bg-white p-3 sm:p-5 pb-12 sm:pb-16 rounded-xl shadow-lg my-2 max-w-4xl mx-auto report-container-for-print text-[11px] sm:text-[12px] leading-[1.3]">
+            <header className="mb-2">
+                <table className="w-full border-none mb-2 word-table-layout">
                     <tbody>
                         <tr>
                             <td className="border-none text-center align-middle w-1/3">
@@ -81,94 +81,94 @@ export const Report: React.FC<ReportProps> = ({ recordData }) => {
                         </tr>
                     </tbody>
                 </table>
-                <div className="border-b border-gray-200 mb-1"></div>
+                <div className="border-b border-gray-200 mb-2"></div>
             </header>
 
-            <section className="mb-1">
+            <section className="mb-2">
                 <h4 className="text-sm font-bold text-gray-800 mb-0.5 text-center">
                     {isFacultyMember ? "بيانات عضو هيئة التدريس" : "بيانات عضو الهيئة المعاونة"}
                 </h4>
-                <table className="w-full border-none mb-1 info-table text-gray-700">
+                <table className="w-full border-none mb-2 info-table text-gray-700">
                     <tbody>
                         <tr>
-                            <td className="border-none text-right font-semibold w-[10%] pb-0.5">الاسم:</td>
-                            <td className="border-none text-right font-medium w-[40%] pb-0.5 border-b border-gray-200">{displayValueOrDash(reportData.name)}</td>
-                            <td className="border-none text-right font-semibold w-[10%] pb-0.5">الدرجة:</td>
-                            <td className="border-none text-right font-medium w-[40%] pb-0.5 border-b border-gray-200">{displayValueOrDash(reportData.degree)}</td>
+                            <td className="border-none text-right font-semibold w-[10%] pb-1">الاسم:</td>
+                            <td className="border-none text-right font-medium w-[40%] pb-1 border-b border-gray-200">{displayValueOrDash(reportData.name)}</td>
+                            <td className="border-none text-right font-semibold w-[10%] pb-1">الدرجة:</td>
+                            <td className="border-none text-right font-medium w-[40%] pb-1 border-b border-gray-200">{displayValueOrDash(reportData.degree)}</td>
                         </tr>
                         <tr>
-                            <td className="border-none text-right font-semibold pb-0.5">القسم:</td>
-                            <td className="border-none text-right font-medium pb-0.5 border-b border-gray-200">{displayValueOrDash(reportData.department)}</td>
-                            <td className="border-none text-right font-semibold pb-0.5">جهة الانتداب:</td>
-                            <td className="border-none text-right font-medium pb-0.5 border-b border-gray-200">{displayValueOrDash(reportData.employer)}</td>
+                            <td className="border-none text-right font-semibold pb-1 pt-1">القسم:</td>
+                            <td className="border-none text-right font-medium pb-1 pt-1 border-b border-gray-200">{displayValueOrDash(reportData.department)}</td>
+                            <td className="border-none text-right font-semibold pb-1 pt-1">جهة الانتداب:</td>
+                            <td className="border-none text-right font-medium pb-1 pt-1 border-b border-gray-200">{displayValueOrDash(reportData.employer)}</td>
                         </tr>
                     </tbody>
                 </table>
             </section>
 
-            <section className="mb-1">
-                <h4 className="text-sm font-bold text-gray-800 mb-0.5 text-center">توزيع الساعات اسبوعيا</h4>
-                <table className="w-full border-collapse text-center text-[10px] sm:text-[11px]">
+            <section className="mb-2">
+                <h4 className="text-sm font-bold text-gray-800 mb-1 text-center">توزيع الساعات اسبوعيا</h4>
+                <table className="w-full border-collapse text-center text-[11px] sm:text-[12px]">
                     <thead className="bg-gray-100">
                         <tr>
-                            <th rowSpan={2} className="border px-1 py-0.5 font-semibold w-1/3">ايام الحضور</th>
-                            <th colSpan={2} className="border px-1 py-0.5 font-semibold w-2/3">ساعات التدريس</th>
+                            <th rowSpan={2} className="border px-1.5 py-1 font-semibold w-1/3">ايام الحضور</th>
+                            <th colSpan={2} className="border px-1.5 py-1 font-semibold w-2/3">ساعات التدريس</th>
                         </tr>
                         <tr>
-                            <th className="border px-1 py-0.5 font-semibold">نظري</th>
-                            <th className="border px-1 py-0.5 font-semibold">درس / اشراف</th>
+                            <th className="border px-1.5 py-1 font-semibold">نظري</th>
+                            <th className="border px-1.5 py-1 font-semibold">درس / اشراف</th>
                         </tr>
                     </thead>
                     <tbody>
                         {reportData.weeklyScheduledDaysForDisplay.map((schedule) => (
                             <tr key={schedule.day}>
-                                <td className="border px-1 py-0.5 text-right">{displayValueOrDash(schedule.day)}</td>
-                                <td className="border px-1 py-0.5">{displayValueOrDash(schedule.theoretical)}</td>
-                                <td className="border px-1 py-0.5">{displayValueOrDash(schedule.practical)}</td>
+                                <td className="border px-1.5 py-1 text-right">{displayValueOrDash(schedule.day)}</td>
+                                <td className="border px-1.5 py-1">{displayValueOrDash(schedule.theoretical)}</td>
+                                <td className="border px-1.5 py-1">{displayValueOrDash(schedule.practical)}</td>
                             </tr>
                         ))}
                         <tr className="bg-gray-50 font-bold">
-                            <td className="border px-1 py-0.5 text-right">إجمالي الساعات الأسبوعية</td>
-                            <td className="border px-1 py-0.5">{displayValueOrDash(reportData.totalScheduledTheoreticalHours)}</td>
-                            <td className="border px-1 py-0.5">{displayValueOrDash(reportData.totalScheduledPracticalHours)}</td>
+                            <td className="border px-1.5 py-1 text-right">إجمالي الساعات الأسبوعية</td>
+                            <td className="border px-1.5 py-1">{displayValueOrDash(reportData.totalScheduledTheoreticalHours)}</td>
+                            <td className="border px-1.5 py-1">{displayValueOrDash(reportData.totalScheduledPracticalHours)}</td>
                         </tr>
                     </tbody>
                 </table>
             </section>
             
-            <section className="mb-1">
-                <h4 className="text-sm font-bold text-gray-800 mb-0.5 text-center">عدد أيام الغياب والحضور الفعلي شهريا</h4>
-                <table className="w-full border-collapse text-center text-[10px] sm:text-[11px]">
+            <section className="mb-2">
+                <h4 className="text-sm font-bold text-gray-800 mb-1 text-center">عدد أيام الغياب والحضور الفعلي شهريا</h4>
+                <table className="w-full border-collapse text-center text-[11px] sm:text-[12px]">
                     <thead className="bg-gray-100">
                         <tr>
-                            <th className="border px-1 py-0.5 font-semibold">م</th>
-                            <th className="border px-1 py-0.5 font-semibold">تاريخ الحضور</th>
-                            <th className="border px-1 py-0.5 font-semibold">اليوم</th>
-                            <th className="border px-1 py-0.5 font-semibold">نظري</th>
-                            <th className="border px-1 py-0.5 font-semibold">عملي</th>
+                            <th className="border px-1.5 py-1 font-semibold">م</th>
+                            <th className="border px-1.5 py-1 font-semibold">تاريخ الحضور</th>
+                            <th className="border px-1.5 py-1 font-semibold">اليوم</th>
+                            <th className="border px-1.5 py-1 font-semibold">نظري</th>
+                            <th className="border px-1.5 py-1 font-semibold">عملي</th>
                         </tr>
                     </thead>
                     <tbody>
                         {reportData.attendanceDates.map((att) => (
                             <tr key={att.serial}>
-                                <td className="border px-1 py-0.5">{displayValueOrDash(att.serial)}</td>
-                                <td className="border px-1 py-0.5">{displayValueOrDash(att.date)}</td>
-                                <td className="border px-1 py-0.5">{displayValueOrDash(att.day)}</td>
-                                <td className="border px-1 py-0.5">{displayValueOrDash(att.theoretical)}</td>
-                                <td className="border px-1 py-0.5">{displayValueOrDash(att.practical)}</td>
+                                <td className="border px-1.5 py-1">{displayValueOrDash(att.serial)}</td>
+                                <td className="border px-1.5 py-1">{displayValueOrDash(att.date)}</td>
+                                <td className="border px-1.5 py-1">{displayValueOrDash(att.day)}</td>
+                                <td className="border px-1.5 py-1">{displayValueOrDash(att.theoretical)}</td>
+                                <td className="border px-1.5 py-1">{displayValueOrDash(att.practical)}</td>
                             </tr>
                         ))}
                         <tr className="bg-gray-50 font-bold">
-                            <td colSpan={3} className="border px-1 py-0.5 text-right">إجمالي الساعات الفعلية</td>
-                            <td className="border px-1 py-0.5">{displayValueOrDash(reportData.totalTheoreticalHoursAttendance)}</td>
-                            <td className="border px-1 py-0.5">{displayValueOrDash(reportData.totalPracticalHoursAttendance)}</td>
+                            <td colSpan={3} className="border px-1.5 py-1 text-right">إجمالي الساعات الفعلية</td>
+                            <td className="border px-1.5 py-1">{displayValueOrDash(reportData.totalTheoreticalHoursAttendance)}</td>
+                            <td className="border px-1.5 py-1">{displayValueOrDash(reportData.totalPracticalHoursAttendance)}</td>
                         </tr>
                     </tbody>
                 </table>
             </section>
 
-            <section className="text-right mb-2 text-[10px] sm:text-[11px]" dir="rtl">
-                 <div className="flex flex-wrap items-center justify-start gap-1 mb-1">
+            <section className="text-right mb-4 text-[11px] sm:text-[12px]" dir="rtl">
+                 <div className="flex flex-wrap items-center justify-start gap-1 mb-2">
                      <strong>إجمالي ساعات الدرس/الاشراف الفعلية:</strong>
                      <span className="inline-block" dir="ltr">{displayValueOrDash(reportData.totalPracticalHoursAttendance)}</span>
                      <span>&#41;{numberToArabicText(reportData.totalPracticalHoursAttendance)}&#40;</span>
@@ -182,38 +182,34 @@ export const Report: React.FC<ReportProps> = ({ recordData }) => {
                  </div>
             </section>
 
-            <footer className="mt-1 break-inside-avoid">
-                <table className="w-full border-none text-center text-[9px] sm:text-[10px] signature-table">
+            <footer className="mt-4 break-inside-avoid">
+                <table className="w-full border-none text-center text-[10px] sm:text-[11px] signature-table">
                     <tbody>
                         <tr>
                             <td className="border-none w-1/3 px-2 align-bottom">
-                                <p className="font-bold mb-0.5">التوقيع</p>
+                                <p className="font-bold mb-1">التوقيع</p>
                                 <div className="border-b border-dotted border-gray-400 h-2 w-4/5 mx-auto"></div>
                             </td>
                             <td className="border-none w-1/3 px-2 align-bottom">
-                                <p className="font-bold mb-0.5">شئون هيئة التدريس</p>
+                                <p className="font-bold mb-1">شئون هيئة التدريس</p>
                                 <div className="border-b border-dotted border-gray-400 h-2 w-4/5 mx-auto"></div>
-                                <div className="font-bold mt-0.5 inline-block">{clerkName}</div>
+                                <div className="font-bold mt-1 inline-block">{clerkName}</div>
                             </td>
                             <td className="border-none w-1/3 px-2 align-bottom">
-                                <p className="font-bold mb-0.5">أمين المعهد</p>
+                                <p className="font-bold mb-1">أمين المعهد</p>
                                 <div className="border-b border-dotted border-gray-400 h-2 w-4/5 mx-auto"></div>
-                                <div className="font-bold mt-0.5 inline-block">{secretaryName}</div>
+                                <div className="font-bold mt-1 inline-block">{secretaryName}</div>
                             </td>
                         </tr>
                     </tbody>
                 </table>
-                <table className="w-full border-none mt-10 signature-table">
-                    <tbody>
-                        <tr>
-                            <td className="border-none text-left w-full">
-                                <p className="font-bold text-[10px] sm:text-[11px]">عميد المعهد</p>
-                                <div className="h-8 w-1/2 ml-auto"></div>
-                                <div className="font-bold text-[10px] sm:text-[11px] mt-0.5 inline-block">{deanName}</div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div className="mt-12 flex justify-end w-full break-before-auto break-inside-avoid">
+                    <div className="flex flex-col items-center text-center w-1/3">
+                        <p className="font-bold text-[11px] sm:text-[12px] mb-0">عميد المعهد</p>
+                        <div className="h-10"></div>
+                        <div className="font-bold text-[11px] sm:text-[12px] mt-1">{deanName}</div>
+                    </div>
+                </div>
             </footer>
         </div>
     );
