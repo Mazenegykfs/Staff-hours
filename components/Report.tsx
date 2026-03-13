@@ -202,11 +202,11 @@ export const Report: React.FC<ReportProps> = ({ recordData }) => {
             <header className="mb-1">
                 <div className="flex justify-between items-center border-b border-gray-200 pb-1 mb-1">
                     <div className="flex items-center gap-2 text-right">
-                        <img src="https://i.ibb.co/6yYJ1Bq/01.png" alt="Logo 01" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
+                        <img src="/ministry-logo.png" alt="وزارة التعليم العالي" crossOrigin="anonymous" referrerPolicy="no-referrer" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
                         <h1 className="text-sm sm:text-base font-bold text-gray-800">وزارة التعليم العالي</h1>
                     </div>
                     <div className="flex items-center gap-2 text-left flex-row-reverse">
-                        <img src="https://i.ibb.co/JqjT7G1/02.png" alt="Logo 02" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
+                        <img src="/kfs-logo.png" alt="المعهد العالي للهندسة والتكنولوجيا" crossOrigin="anonymous" referrerPolicy="no-referrer" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
                         <div>
                             <h2 className="text-xs sm:text-sm font-bold text-gray-800">المعهد العالي للهندسة والتكنولوجيا</h2>
                             <h3 className="text-[10px] sm:text-xs font-semibold text-gray-600">بكفر الشيخ</h3>

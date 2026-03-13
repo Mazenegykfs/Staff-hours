@@ -137,6 +137,7 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
                         className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                     >
                         <option value="">اختر القسم</option>
+                        <option value="العلوم الاساسية">العلوم الاساسية</option>
                         <option value="الهندسة المدنية">الهندسة المدنية</option>
                         <option value="الهندسة المعمارية">الهندسة المعمارية</option>
                         <option value="الهندسة الكهربية (شعبة هندسة الاتصالات والإلكترونيات الكهربية)">الهندسة الكهربية (شعبة هندسة الاتصالات والإلكترونيات الكهربية)</option>
