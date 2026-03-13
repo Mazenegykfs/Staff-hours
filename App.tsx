@@ -3,10 +3,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Report } from './components/Report';
 import { InsertForm } from './components/InsertForm';
 import { StaffRecord } from './types';
-import { Plus, Printer, FileText, Trash2, Edit, List, LogIn, LogOut, User as UserIcon, PenTool } from 'lucide-react';
+import { Plus, Printer, FileText, Trash2, Edit, List, LogIn, LogOut, User as UserIcon, PenTool, Download } from 'lucide-react';
 import ReactDOM from 'react-dom/client';
 import { auth, db, loginWithGoogle, logout, onAuthStateChanged, User } from './firebase';
 import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { exportToDocx, exportAllToDocx } from './utils/wordExport';
 
 declare var html2pdf: any;
 
@@ -260,6 +261,40 @@ const App: React.FC = () => {
         }, 1500);
     };
 
+    const handleExportWord = async () => {
+        if (!selectedRecord) return;
+        
+        try {
+            const deanName = localStorage.getItem('deanName') || 'أ.د. مصطفى كامل';
+            const clerkName = localStorage.getItem('clerkName') || 'الاسم';
+            const secretaryName = localStorage.getItem('secretaryName') || 'الاسم';
+            
+            await exportToDocx(selectedRecord, deanName, clerkName, secretaryName);
+            setMessage('تم تصدير ملف Word بنجاح.');
+            setTimeout(() => setMessage(''), 3000);
+        } catch (error: any) {
+            console.error('Error generating Word doc:', error);
+            setMessage(`حدث خطأ أثناء إنشاء ملف Word: ${error.message}`);
+            setTimeout(() => setMessage(''), 3000);
+        }
+    };
+
+    const handleExportAllWord = async () => {
+        try {
+            const deanName = localStorage.getItem('deanName') || 'أ.د. مصطفى كامل';
+            const clerkName = localStorage.getItem('clerkName') || 'الاسم';
+            const secretaryName = localStorage.getItem('secretaryName') || 'الاسم';
+            
+            await exportAllToDocx(allRecords, deanName, clerkName, secretaryName);
+            setMessage('تم تصدير جميع التقارير في ملف Word بنجاح.');
+            setTimeout(() => setMessage(''), 3000);
+        } catch (error: any) {
+            console.error('Error generating Word doc:', error);
+            setMessage(`حدث خطأ أثناء إنشاء ملف Word: ${error.message}`);
+            setTimeout(() => setMessage(''), 3000);
+        }
+    };
+
     const handleEditSignatures = () => {
         setSignatureData({
             deanName: localStorage.getItem('deanName') || 'أ.د. مصطفى كامل',
@@ -453,12 +488,20 @@ const App: React.FC = () => {
                         <Plus size={20} /> إضافة جديد
                     </button>
                     {allRecords.length > 0 && (
-                        <button
-                            onClick={handlePrintAllReports}
-                            className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-md"
-                        >
-                            <Printer size={20} /> طباعة الكل (PDF)
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handlePrintAllReports}
+                                className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-md"
+                            >
+                                <Printer size={20} /> طباعة الكل (PDF)
+                            </button>
+                            <button
+                                onClick={handleExportAllWord}
+                                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md"
+                            >
+                                <Download size={20} /> تصدير الكل (Word)
+                            </button>
+                        </div>
                     )}
                 </div>
 
@@ -547,12 +590,20 @@ const App: React.FC = () => {
                             >
                                 <List size={20} /> العودة للقائمة
                             </button>
-                            <button
-                                onClick={handlePrintCurrentReport}
-                                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md"
-                            >
-                                <Printer size={20} /> طباعة التقرير (PDF)
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleExportWord}
+                                    className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-md"
+                                >
+                                    <Download size={20} /> تصدير Word
+                                </button>
+                                <button
+                                    onClick={handlePrintCurrentReport}
+                                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md"
+                                >
+                                    <Printer size={20} /> طباعة التقرير (PDF)
+                                </button>
+                            </div>
                         </div>
                         <div ref={reportContainerRef}>
                             <Report recordData={selectedRecord} />
