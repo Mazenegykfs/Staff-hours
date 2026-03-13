@@ -1,5 +1,5 @@
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { StaffRecord, ReportProps } from '../types';
 import { ORDERED_ARABIC_DAYS, DAY_MAP } from '../constants';
 
@@ -67,8 +67,50 @@ const displayValueOrDash = (value: any): string | number => {
     return (value === 0 || value === '' || value === undefined || value === null) ? '-' : value;
 };
 
+const useSharedState = (key: string, initialValue: string) => {
+    const [value, setValue] = useState(() => {
+        const item = localStorage.getItem(key);
+        return item !== null ? item : initialValue;
+    });
+
+    useEffect(() => {
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === key && e.newValue !== null) {
+                setValue(e.newValue);
+            }
+        };
+        const handleCustomChange = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            if (customEvent.detail.key === key) {
+                setValue(customEvent.detail.value);
+            }
+        };
+        window.addEventListener('storage', handleStorageChange);
+        window.addEventListener('sharedStateChange', handleCustomChange);
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('sharedStateChange', handleCustomChange);
+        };
+    }, [key]);
+
+    const setSharedValue = (newValue: string) => {
+        setValue(newValue);
+        localStorage.setItem(key, newValue);
+        window.dispatchEvent(new CustomEvent('sharedStateChange', { detail: { key, value: newValue } }));
+    };
+
+    return [value, setSharedValue] as const;
+};
 
 export const Report: React.FC<ReportProps> = ({ recordData }) => {
+    const [deanName, setDeanName] = useSharedState("deanName", "أ.د. مصطفى كامل");
+    const [clerkName, setClerkName] = useSharedState("clerkName", "الاسم");
+    const [secretaryName, setSecretaryName] = useSharedState("secretaryName", "الاسم");
+
+    const isFacultyMember = useMemo(() => {
+        const degree = recordData.degree?.trim() || "";
+        return ["مدرس", "استاذ مساعد", "أستاذ مساعد", "استاذ", "أستاذ"].includes(degree);
+    }, [recordData.degree]);
 
     const reportData = useMemo(() => {
         const { name, degree, department, employer, weeklySchedule, attendanceDates: rawAttendanceDates } = recordData;
@@ -100,19 +142,34 @@ export const Report: React.FC<ReportProps> = ({ recordData }) => {
         const attendanceDates = [];
         let totalTheoreticalHoursAttendance = 0;
         let totalPracticalHoursAttendance = 0;
-        let attendanceMonthHeader = "استمارات شهر أبريل - مايو 2024-2025م"; // Default
+        let attendanceMonth = "أبريل - مايو";
+        let attendanceYearStart = 2024;
+        let attendanceYearEnd = 2025;
 
         rawAttendanceDates.forEach((dateStr, index) => {
             const dateObj = new Date(dateStr);
             if (dateObj && !isNaN(dateObj.getTime())) {
-                const formattedDate = dateObj.toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                const y = dateObj.getFullYear();
+                const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const d = String(dateObj.getDate()).padStart(2, '0');
+                const formattedDate = `${y}-${m}-${d}`;
                 const dayOfWeekFromDate = normalizeArabicDayNameForComparison(dateObj.toLocaleDateString('ar-EG', { weekday: 'long' }));
                 
                 if (index === 0) {
                    const monthNumber = dateObj.getMonth() + 1;
-                   const arabicMonth = getArabicMonthName(monthNumber);
-                   const year = dateObj.getFullYear();
-                   attendanceMonthHeader = `استمارة شهر ${arabicMonth} ${year}-${year + 1}م`;
+                   attendanceMonth = getArabicMonthName(monthNumber);
+                   const currentYear = dateObj.getFullYear();
+                   
+                   // Fall semester (August to December)
+                   if ([8, 9, 10, 11, 12].includes(monthNumber)) {
+                       attendanceYearStart = currentYear;
+                       attendanceYearEnd = currentYear + 1;
+                   } 
+                   // Spring/Summer semester (January to July)
+                   else {
+                       attendanceYearStart = currentYear - 1;
+                       attendanceYearEnd = currentYear;
+                   }
                 }
                 
                 const scheduled = weeklyScheduledHoursMap.get(dayOfWeekFromDate);
@@ -135,130 +192,156 @@ export const Report: React.FC<ReportProps> = ({ recordData }) => {
         return {
             name, degree, department, employer,
             weeklyScheduledDaysForDisplay, totalScheduledTheoreticalHours, totalScheduledPracticalHours, totalScheduledWeeklyHours,
-            attendanceDates, totalTheoreticalHoursAttendance, totalPracticalHoursAttendance, attendanceMonthHeader
+            attendanceDates, totalTheoreticalHoursAttendance, totalPracticalHoursAttendance, attendanceMonth, attendanceYearStart, attendanceYearEnd
         };
     }, [recordData]);
 
 
     return (
-        <div className="bg-white p-6 sm:p-10 rounded-xl shadow-lg my-8 max-w-4xl mx-auto report-container-for-print">
-            <header>
-                <div className="text-center mb-4 flex justify-between items-center relative">
-                    <img src="https://i.ibb.co/6yYJ1Bq/01.png" alt="Logo 01" className="w-24 h-24 sm:w-32 sm:h-32 object-contain" />
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-800">وزارة التعليم العالي</h1>
-                    <img src="https://i.ibb.co/JqjT7G1/02.png" alt="Logo 02" className="w-24 h-24 sm:w-32 sm:h-32 object-contain" />
+        <div className="bg-white p-2 sm:p-4 pb-12 sm:pb-16 rounded-xl shadow-lg my-2 max-w-4xl mx-auto report-container-for-print text-[10px] sm:text-[11px] leading-[1.1]">
+            <header className="mb-1">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-1 mb-1">
+                    <div className="flex items-center gap-2 text-right">
+                        <img src="https://i.ibb.co/6yYJ1Bq/01.png" alt="Logo 01" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
+                        <h1 className="text-sm sm:text-base font-bold text-gray-800">وزارة التعليم العالي</h1>
+                    </div>
+                    <div className="flex items-center gap-2 text-left flex-row-reverse">
+                        <img src="https://i.ibb.co/JqjT7G1/02.png" alt="Logo 02" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
+                        <div>
+                            <h2 className="text-xs sm:text-sm font-bold text-gray-800">المعهد العالي للهندسة والتكنولوجيا</h2>
+                            <h3 className="text-[10px] sm:text-xs font-semibold text-gray-600">بكفر الشيخ</h3>
+                        </div>
+                    </div>
                 </div>
-                <div className="text-center mb-6">
-                    <h2 className="text-lg sm:text-xl font-semibold text-gray-700">المعهد العالي للهندسة والتكنولوجيا</h2>
-                    <h3 className="text-base sm:text-lg text-gray-600">بكفر الشيخ</h3>
-                </div>
-                <div className="mb-6">
-                    <h4 className="text-xl font-bold text-gray-800 text-center">{reportData.attendanceMonthHeader}</h4>
+                <div className="text-center">
+                    <h4 className="text-sm sm:text-base font-bold text-gray-800" dir="rtl">
+                        استمارة شهر {reportData.attendanceMonth} <span dir="ltr" className="inline-block">{reportData.attendanceYearEnd}-{reportData.attendanceYearStart}</span>م
+                    </h4>
                 </div>
             </header>
 
-            <section className="mb-6">
-                <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">بيانات عضو هيئة التدريس / الهيئة المعاونة</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-gray-700 text-base">
+            <section className="mb-1">
+                <h4 className="text-sm font-bold text-gray-800 mb-0.5 text-center">
+                    {isFacultyMember ? "بيانات عضو هيئة التدريس" : "بيانات عضو الهيئة المعاونة"}
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0.5 text-gray-700">
                     {[
                         { label: 'الاسم:', value: reportData.name },
                         { label: 'الدرجة:', value: reportData.degree },
                         { label: 'القسم:', value: reportData.department },
                         { label: 'جهة الانتداب:', value: reportData.employer },
                     ].map(item => (
-                        <div key={item.label} className="flex justify-between border-b pb-2">
-                            <span className="font-semibold">{item.label}</span>
-                            <span className="text-right">{displayValueOrDash(item.value)}</span>
+                        <div key={item.label} className="flex justify-start gap-2 border-b pb-0.5">
+                            <span className="font-semibold w-20 shrink-0 text-right">{item.label}</span>
+                            <span className="text-right flex-1 font-medium">{displayValueOrDash(item.value)}</span>
                         </div>
                     ))}
                 </div>
             </section>
 
-            <section className="mb-6">
-                <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">توزيع الساعات اسبوعيا</h4>
-                <table className="w-full border-collapse text-center">
+            <section className="mb-1">
+                <h4 className="text-sm font-bold text-gray-800 mb-0.5 text-center">توزيع الساعات اسبوعيا</h4>
+                <table className="w-full border-collapse text-center text-[10px] sm:text-[11px]">
                     <thead className="bg-gray-100">
                         <tr>
-                            <th rowSpan={2} className="border p-2 font-semibold w-1/3">ايام الحضور</th>
-                            <th colSpan={2} className="border p-2 font-semibold w-2/3">ساعات التدريس</th>
+                            <th rowSpan={2} className="border px-1 py-0.5 font-semibold w-1/3">ايام الحضور</th>
+                            <th colSpan={2} className="border px-1 py-0.5 font-semibold w-2/3">ساعات التدريس</th>
                         </tr>
                         <tr>
-                            <th className="border p-2 font-semibold">نظري</th>
-                            <th className="border p-2 font-semibold">درس / اشراف</th>
+                            <th className="border px-1 py-0.5 font-semibold">نظري</th>
+                            <th className="border px-1 py-0.5 font-semibold">درس / اشراف</th>
                         </tr>
                     </thead>
                     <tbody>
                         {reportData.weeklyScheduledDaysForDisplay.map((schedule) => (
                             <tr key={schedule.day}>
-                                <td className="border p-2 text-right">{displayValueOrDash(schedule.day)}</td>
-                                <td className="border p-2">{displayValueOrDash(schedule.theoretical)}</td>
-                                <td className="border p-2">{displayValueOrDash(schedule.practical)}</td>
+                                <td className="border px-1 py-0.5 text-right">{displayValueOrDash(schedule.day)}</td>
+                                <td className="border px-1 py-0.5">{displayValueOrDash(schedule.theoretical)}</td>
+                                <td className="border px-1 py-0.5">{displayValueOrDash(schedule.practical)}</td>
                             </tr>
                         ))}
                         <tr className="bg-gray-50 font-bold">
-                            <td className="border p-2 text-right">إجمالي الساعات الأسبوعية</td>
-                            <td className="border p-2">{displayValueOrDash(reportData.totalScheduledTheoreticalHours)}</td>
-                            <td className="border p-2">{displayValueOrDash(reportData.totalScheduledPracticalHours)}</td>
-                        </tr>
-                         <tr className="bg-gray-100 font-bold">
-                            <td colSpan={3} className="border p-2 text-right">إجمالي ساعات الجدول: {displayValueOrDash(reportData.totalScheduledWeeklyHours)} ساعة</td>
+                            <td className="border px-1 py-0.5 text-right">إجمالي الساعات الأسبوعية</td>
+                            <td className="border px-1 py-0.5">{displayValueOrDash(reportData.totalScheduledTheoreticalHours)}</td>
+                            <td className="border px-1 py-0.5">{displayValueOrDash(reportData.totalScheduledPracticalHours)}</td>
                         </tr>
                     </tbody>
                 </table>
             </section>
             
-            <section className="mb-6">
-                <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">عدد أيام الغياب والحضور الفعلي شهريا</h4>
-                <table className="w-full border-collapse text-center">
+            <section className="mb-1">
+                <h4 className="text-sm font-bold text-gray-800 mb-0.5 text-center">عدد أيام الغياب والحضور الفعلي شهريا</h4>
+                <table className="w-full border-collapse text-center text-[10px] sm:text-[11px]">
                     <thead className="bg-gray-100">
                         <tr>
-                            <th className="border p-2 font-semibold">م</th>
-                            <th className="border p-2 font-semibold">تاريخ الحضور</th>
-                            <th className="border p-2 font-semibold">اليوم</th>
-                            <th className="border p-2 font-semibold">نظري</th>
-                            <th className="border p-2 font-semibold">عملي</th>
-                            <th className="border p-2 font-semibold">توقيع</th>
+                            <th className="border px-1 py-0.5 font-semibold">م</th>
+                            <th className="border px-1 py-0.5 font-semibold">تاريخ الحضور</th>
+                            <th className="border px-1 py-0.5 font-semibold">اليوم</th>
+                            <th className="border px-1 py-0.5 font-semibold">نظري</th>
+                            <th className="border px-1 py-0.5 font-semibold">عملي</th>
                         </tr>
                     </thead>
                     <tbody>
                         {reportData.attendanceDates.map((att) => (
                             <tr key={att.serial}>
-                                <td className="border p-2">{displayValueOrDash(att.serial)}</td>
-                                <td className="border p-2">{displayValueOrDash(att.date)}</td>
-                                <td className="border p-2">{displayValueOrDash(att.day)}</td>
-                                <td className="border p-2">{displayValueOrDash(att.theoretical)}</td>
-                                <td className="border p-2">{displayValueOrDash(att.practical)}</td>
-                                <td className="border p-2"></td>
+                                <td className="border px-1 py-0.5">{displayValueOrDash(att.serial)}</td>
+                                <td className="border px-1 py-0.5">{displayValueOrDash(att.date)}</td>
+                                <td className="border px-1 py-0.5">{displayValueOrDash(att.day)}</td>
+                                <td className="border px-1 py-0.5">{displayValueOrDash(att.theoretical)}</td>
+                                <td className="border px-1 py-0.5">{displayValueOrDash(att.practical)}</td>
                             </tr>
                         ))}
                         <tr className="bg-gray-50 font-bold">
-                            <td colSpan={3} className="border p-2 text-right">إجمالي الساعات الفعلية</td>
-                            <td className="border p-2">{displayValueOrDash(reportData.totalTheoreticalHoursAttendance)}</td>
-                            <td className="border p-2">{displayValueOrDash(reportData.totalPracticalHoursAttendance)}</td>
-                            <td className="border p-2"></td>
+                            <td colSpan={3} className="border px-1 py-0.5 text-right">إجمالي الساعات الفعلية</td>
+                            <td className="border px-1 py-0.5">{displayValueOrDash(reportData.totalTheoreticalHoursAttendance)}</td>
+                            <td className="border px-1 py-0.5">{displayValueOrDash(reportData.totalPracticalHoursAttendance)}</td>
                         </tr>
                     </tbody>
                 </table>
             </section>
 
-            <section className="text-right mb-10 text-base">
-                 <p><strong>إجمالي ساعات الدرس/الاشراف الفعلية:</strong> {displayValueOrDash(reportData.totalPracticalHoursAttendance)} ({numberToArabicText(reportData.totalPracticalHoursAttendance)}) ساعة</p>
-                 <p><strong>إجمالي ساعات المحاضرات الفعلية:</strong> {displayValueOrDash(reportData.totalTheoreticalHoursAttendance)} ({numberToArabicText(reportData.totalTheoreticalHoursAttendance)}) ساعة</p>
+            <section className="text-right mb-2 text-[10px] sm:text-[11px]" dir="rtl">
+                 <div className="flex flex-wrap items-center justify-start gap-1 mb-1">
+                     <strong>إجمالي ساعات الدرس/الاشراف الفعلية:</strong>
+                     <span className="inline-block" dir="ltr">{displayValueOrDash(reportData.totalPracticalHoursAttendance)}</span>
+                     <span>&#41;{numberToArabicText(reportData.totalPracticalHoursAttendance)}&#40;</span>
+                     <span>ساعة</span>
+                 </div>
+                 <div className="flex flex-wrap items-center justify-start gap-1">
+                     <strong>إجمالي ساعات المحاضرات الفعلية:</strong>
+                     <span className="inline-block" dir="ltr">{displayValueOrDash(reportData.totalTheoreticalHoursAttendance)}</span>
+                     <span>&#41;{numberToArabicText(reportData.totalTheoreticalHoursAttendance)}&#40;</span>
+                     <span>ساعة</span>
+                 </div>
             </section>
 
-            <footer className="mt-20">
-                <div className="flex justify-around items-end mb-16 text-center text-sm sm:text-base">
-                    {[ "التوقيع", "شئون هيئة التدريس", "أمين المعهد" ].map(title => (
-                        <div key={title} className="flex-1">
-                            <p className="font-bold mb-2">{title}</p>
-                            <div className="border-b-2 border-dotted border-gray-400 h-10"></div>
+            <footer className="mt-1 break-inside-avoid">
+                <div className="flex justify-around items-end mb-1 text-center text-[9px] sm:text-[10px]">
+                    <div className="flex-1 px-2">
+                        <p className="font-bold mb-0.5">التوقيع</p>
+                        <div className="border-b border-dotted border-gray-400 h-2"></div>
+                    </div>
+                    <div className="flex-1 px-2 relative group">
+                        <p className="font-bold mb-0.5">شئون هيئة التدريس</p>
+                        <div className="border-b border-dotted border-gray-400 h-2"></div>
+                        <div className="font-bold mt-0.5 inline-block">
+                            {clerkName}
                         </div>
-                    ))}
+                    </div>
+                    <div className="flex-1 px-2 relative group">
+                        <p className="font-bold mb-0.5">أمين المعهد</p>
+                        <div className="border-b border-dotted border-gray-400 h-2"></div>
+                        <div className="font-bold mt-0.5 inline-block">
+                            {secretaryName}
+                        </div>
+                    </div>
                 </div>
-                <div className="text-left mt-10">
-                    <p className="font-bold text-base sm:text-lg">عميد المعهد</p>
-                    <div className="border-b-2 border-dotted border-gray-400 h-10 w-2/3"></div>
-                    <p className="font-bold text-base sm:text-lg mt-2">( أ.د. / مصطفى كامل )</p>
+                <div className="text-left mt-10 relative group">
+                    <p className="font-bold text-[10px] sm:text-[11px]">عميد المعهد</p>
+                    <div className="h-8 w-1/2 ml-auto"></div>
+                    <div className="font-bold text-[10px] sm:text-[11px] mt-0.5 inline-block">
+                        {deanName}
+                    </div>
                 </div>
             </footer>
         </div>

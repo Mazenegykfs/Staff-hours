@@ -3,12 +3,59 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Report } from './components/Report';
 import { InsertForm } from './components/InsertForm';
 import { StaffRecord } from './types';
-import { Plus, Printer, FileText, Trash2, Edit, List, LogIn, LogOut, User as UserIcon } from 'lucide-react';
+import { Plus, Printer, FileText, Trash2, Edit, List, LogIn, LogOut, User as UserIcon, PenTool } from 'lucide-react';
 import ReactDOM from 'react-dom/client';
 import { auth, db, loginWithGoogle, logout, onAuthStateChanged, User } from './firebase';
 import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 
 declare var html2pdf: any;
+
+const PrintableReport = ({ record }: { record: StaffRecord }) => {
+    const [scale, setScale] = useState(1);
+    const [wrapperHeight, setWrapperHeight] = useState<number | 'auto'>('auto');
+    const innerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const scaleContent = () => {
+            if (innerRef.current) {
+                // Reset to measure true height
+                setScale(1);
+                setWrapperHeight('auto');
+                
+                setTimeout(() => {
+                    if (innerRef.current) {
+                        const height = innerRef.current.offsetHeight;
+                        // A4 height at 96dpi is ~1123px. With margins, safe height is ~980px to avoid bottom clipping.
+                        const targetHeight = 980; 
+                        
+                        if (height > targetHeight) {
+                            const newScale = targetHeight / height;
+                            setScale(newScale);
+                            setWrapperHeight(height * newScale + 20); // Add 20px buffer to prevent clipping
+                        }
+                    }
+                }, 50);
+            }
+        };
+
+        scaleContent();
+    }, [record]);
+
+    return (
+        <div style={{ height: wrapperHeight, overflow: 'hidden' }} className="w-full">
+            <div 
+                ref={innerRef} 
+                style={{ 
+                    transform: `scale(${scale})`, 
+                    transformOrigin: 'top center',
+                    width: '100%'
+                }}
+            >
+                <Report recordData={record} />
+            </div>
+        </div>
+    );
+};
 
 const App: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
@@ -20,8 +67,16 @@ const App: React.FC = () => {
     const [message, setMessage] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isPrintingAll, setIsPrintingAll] = useState<boolean>(false);
+    const [printingSingleId, setPrintingSingleId] = useState<string>('');
+    const [isEditingSignatures, setIsEditingSignatures] = useState<boolean>(false);
+    const [signatureData, setSignatureData] = useState({
+        deanName: localStorage.getItem('deanName') || 'أ.د. مصطفى كامل',
+        clerkName: localStorage.getItem('clerkName') || 'الاسم',
+        secretaryName: localStorage.getItem('secretaryName') || 'الاسم'
+    });
     const reportContainerRef = useRef<HTMLDivElement>(null);
     const allReportsRef = useRef<HTMLDivElement>(null);
+    const singleReportRef = useRef<HTMLDivElement>(null);
 
     // Auth listener
     useEffect(() => {
@@ -110,52 +165,24 @@ const App: React.FC = () => {
     const selectedRecord = allRecords.find(r => r.id === selectedStaffId);
 
     const getPdfOptions = (filename: string) => ({
-        margin: [10, 10, 10, 10],
+        margin: [5, 5, 5, 5],
         filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
             scale: 2, 
             useCORS: true, 
-            letterRendering: true,
-            scrollX: 0,
-            scrollY: 0
+            letterRendering: true
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'avoid-all'] }
     });
 
     const handlePrintCurrentReport = async () => {
-        if (!selectedRecord || !reportContainerRef.current) {
+        if (!selectedRecord) {
             setMessage('الرجاء اختيار عضو هيئة تدريس لعرض وطباعة تقريره.');
             return;
         }
-
-        setIsLoading(true);
-        setMessage('جاري إنشاء ملف PDF للتقرير الحالي...');
-
-        try {
-            const element = reportContainerRef.current;
-            const options = getPdfOptions(`تقرير_${selectedRecord.name.replace(/\s/g, '_')}.pdf`);
-            
-            // Ensure images are loaded
-            const images = element.getElementsByTagName('img');
-            await Promise.all(Array.from(images).map(img => {
-                if (img.complete) return Promise.resolve();
-                return new Promise(resolve => {
-                    img.onload = resolve;
-                    img.onerror = resolve;
-                });
-            }));
-
-            await html2pdf().from(element).set(options).save();
-            setMessage('تم إنشاء ملف PDF بنجاح.');
-        } catch (error: any) {
-            console.error('PDF Error:', error);
-            setMessage(`حدث خطأ: ${error.message}`);
-        } finally {
-            setIsLoading(false);
-            setTimeout(() => setMessage(''), 3000);
-        }
+        await handlePrintSingleFromList(selectedRecord);
     };
     
     const handlePrintAllReports = async () => {
@@ -199,28 +226,106 @@ const App: React.FC = () => {
         }, 1500); // Give React time to render the hidden list
     };
 
+    const handlePrintSingleFromList = async (record: StaffRecord) => {
+        setPrintingSingleId(record.id);
+        setIsLoading(true);
+        setMessage('جاري تحضير التقرير للطباعة...');
+
+        setTimeout(async () => {
+            try {
+                if (!singleReportRef.current) throw new Error('فشل في الوصول إلى حاوية التقرير');
+                
+                const element = singleReportRef.current;
+                const options = getPdfOptions(`تقرير_${record.name.replace(/\s/g, '_')}.pdf`);
+
+                const images = element.getElementsByTagName('img');
+                await Promise.all(Array.from(images).map(img => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise(resolve => {
+                        img.onload = resolve;
+                        img.onerror = resolve;
+                    });
+                }));
+
+                await html2pdf().from(element).set(options).save();
+                setMessage('تم إنشاء ملف PDF بنجاح.');
+            } catch (error: any) {
+                console.error('Error generating PDF:', error);
+                setMessage(`حدث خطأ أثناء إنشاء ملف PDF: ${error.message}`);
+            } finally {
+                setIsLoading(false);
+                setPrintingSingleId('');
+                setTimeout(() => setMessage(''), 3000);
+            }
+        }, 1500);
+    };
+
+    const handleEditSignatures = () => {
+        setSignatureData({
+            deanName: localStorage.getItem('deanName') || 'أ.د. مصطفى كامل',
+            clerkName: localStorage.getItem('clerkName') || 'الاسم',
+            secretaryName: localStorage.getItem('secretaryName') || 'الاسم'
+        });
+        setIsEditingSignatures(true);
+    };
+
+    const handleSaveSignatures = () => {
+        localStorage.setItem('deanName', signatureData.deanName);
+        window.dispatchEvent(new CustomEvent('sharedStateChange', { detail: { key: 'deanName', value: signatureData.deanName } }));
+        
+        localStorage.setItem('clerkName', signatureData.clerkName);
+        window.dispatchEvent(new CustomEvent('sharedStateChange', { detail: { key: 'clerkName', value: signatureData.clerkName } }));
+        
+        localStorage.setItem('secretaryName', signatureData.secretaryName);
+        window.dispatchEvent(new CustomEvent('sharedStateChange', { detail: { key: 'secretaryName', value: signatureData.secretaryName } }));
+        
+        setIsEditingSignatures(false);
+        setMessage('تم حفظ التوقيعات بنجاح');
+        setTimeout(() => setMessage(''), 3000);
+    };
+
     return (
         <div className="bg-gray-50 min-h-screen text-gray-800 p-4 sm:p-8" style={{ fontFamily: "'Cairo', sans-serif" }} dir="rtl">
-            {/* Hidden container for bulk printing */}
+            {/* Hidden container for single printing */}
             <div 
-                ref={allReportsRef} 
                 style={{ 
                     position: 'absolute', 
-                    top: '-10000px', 
-                    left: '-10000px', 
-                    width: '210mm', // A4 width
-                    visibility: isPrintingAll ? 'visible' : 'hidden'
+                    top: 0, 
+                    left: 0, 
+                    width: '210mm',
+                    zIndex: 40,
+                    display: printingSingleId ? 'block' : 'none'
                 }}
             >
-                {isPrintingAll && allRecords.map((record, index) => (
-                    <div key={record.id} className={index < allRecords.length - 1 ? "pdf-page-break" : ""}>
-                        <Report recordData={record} />
-                    </div>
-                ))}
+                <div ref={singleReportRef} className="bg-white">
+                    {printingSingleId && (
+                        <PrintableReport record={allRecords.find(r => r.id === printingSingleId)!} />
+                    )}
+                </div>
+            </div>
+
+            {/* Hidden container for bulk printing */}
+            <div 
+                style={{ 
+                    position: 'absolute', 
+                    top: 0, 
+                    left: 0, 
+                    width: '210mm', // A4 width
+                    zIndex: 40,
+                    display: isPrintingAll ? 'block' : 'none'
+                }}
+            >
+                <div ref={allReportsRef} className="bg-white">
+                    {isPrintingAll && allRecords.map((record, index) => (
+                        <div key={record.id} className={index < allRecords.length - 1 ? "pdf-page-break" : ""}>
+                            <PrintableReport record={record} />
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {isLoading && (
-                <div className="fixed inset-0 bg-white bg-opacity-75 flex flex-col justify-center items-center z-50">
+                <div className="fixed inset-0 bg-white flex flex-col justify-center items-center z-50">
                     <div className="spinner border-4 border-gray-200 border-t-blue-500 rounded-full w-12 h-12 animate-spin"></div>
                     <p className="mt-4 text-lg font-semibold text-blue-600">{message}</p>
                 </div>
@@ -229,6 +334,57 @@ const App: React.FC = () => {
             {message && !isLoading && (
                 <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg z-50 animate-bounce">
                     {message}
+                </div>
+            )}
+
+            {isEditingSignatures && (
+                <div className="fixed inset-0 bg-black/50 flex flex-col justify-center items-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md" dir="rtl">
+                        <h2 className="text-xl font-bold text-gray-800 mb-4">تعديل التوقيعات</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">اسم عميد المعهد</label>
+                                <input 
+                                    type="text" 
+                                    value={signatureData.deanName}
+                                    onChange={(e) => setSignatureData({...signatureData, deanName: e.target.value})}
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">اسم شئون هيئة التدريس</label>
+                                <input 
+                                    type="text" 
+                                    value={signatureData.clerkName}
+                                    onChange={(e) => setSignatureData({...signatureData, clerkName: e.target.value})}
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">اسم أمين المعهد</label>
+                                <input 
+                                    type="text" 
+                                    value={signatureData.secretaryName}
+                                    onChange={(e) => setSignatureData({...signatureData, secretaryName: e.target.value})}
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button 
+                                onClick={() => setIsEditingSignatures(false)}
+                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                إلغاء
+                            </button>
+                            <button 
+                                onClick={handleSaveSignatures}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                            >
+                                حفظ التغييرات
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -285,6 +441,12 @@ const App: React.FC = () => {
                         <List size={20} /> قائمة السجلات
                     </button>
                     <button
+                        onClick={handleEditSignatures}
+                        className="flex items-center gap-2 px-6 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition-all shadow-sm border border-gray-200"
+                    >
+                        <PenTool size={20} /> تعديل التوقيعات
+                    </button>
+                    <button
                         onClick={() => { setView('insert'); setEditingRecord(undefined); }}
                         className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-all ${view === 'insert' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
                     >
@@ -337,6 +499,13 @@ const App: React.FC = () => {
                                                 <td className="px-6 py-4">{record.degree || '-'}</td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex justify-center gap-2">
+                                                        <button
+                                                            onClick={() => handlePrintSingleFromList(record)}
+                                                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                            title="طباعة التقرير"
+                                                        >
+                                                            <Printer size={20} />
+                                                        </button>
                                                         <button
                                                             onClick={() => handleViewReport(record.id)}
                                                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

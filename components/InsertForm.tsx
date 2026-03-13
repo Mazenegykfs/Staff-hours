@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { StaffRecord, WeeklySchedule } from '../types';
 import { ORDERED_ARABIC_DAYS } from '../constants';
 import { Plus, Trash2, Save, X } from 'lucide-react';
+import DatePicker, { DateObject } from "react-multi-date-picker";
 
 interface InsertFormProps {
     onSave: (record: StaffRecord) => void;
@@ -28,8 +29,17 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
     );
 
     const [attendanceDates, setAttendanceDates] = useState<string[]>(initialData?.attendanceDates || []);
-    const [newDate, setNewDate] = useState('');
     const [error, setError] = useState('');
+
+    const isTheoreticalDisabled = ['معيد', 'مدرس مساعد', 'مهندس حر'].includes(degree);
+
+    const handleDegreeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newDegree = e.target.value;
+        setDegree(newDegree);
+        if (['معيد', 'مدرس مساعد', 'مهندس حر'].includes(newDegree)) {
+            setWeeklySchedule(prev => prev.map(item => ({ ...item, theoretical: 0 })));
+        }
+    };
 
     const handleScheduleChange = (index: number, field: keyof WeeklySchedule, value: string | number) => {
         const updated = [...weeklySchedule];
@@ -37,14 +47,17 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
         setWeeklySchedule(updated);
     };
 
-    const addAttendanceDate = () => {
-        setError('');
-        if (!newDate) return;
+    const removeAttendanceDate = (date: string) => {
+        setAttendanceDates(attendanceDates.filter(d => d !== date));
+    };
 
-        const dateObj = new Date(newDate);
-        const dayName = dateObj.toLocaleDateString('ar-EG', { weekday: 'long' });
-        
-        // Normalize day name for comparison
+    const today = new Date();
+    const minDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+    const maxDate = new Date(today.getFullYear(), today.getMonth() + 3, 0);
+
+    const mapDays = ({ date }: { date: DateObject }) => {
+        const jsDate = date.toDate();
+        const dayName = jsDate.toLocaleDateString('ar-EG', { weekday: 'long' });
         const normalizedDay = ORDERED_ARABIC_DAYS.find(d => 
             dayName.includes(d) || d.includes(dayName)
         ) || dayName;
@@ -52,18 +65,13 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
         const scheduledDay = weeklySchedule.find(s => s.day === normalizedDay);
         
         if (!scheduledDay || (scheduledDay.theoretical === 0 && scheduledDay.practical === 0)) {
-            setError(`عذراً، يوم ${normalizedDay} غير مدرج في جدول الساعات الأسبوعية لهذا العضو.`);
-            return;
+            return {
+                disabled: true,
+                style: { color: "#ccc" },
+                onClick: () => setError(`عذراً، يوم ${normalizedDay} غير مدرج في جدول الساعات الأسبوعية لهذا العضو.`)
+            }
         }
-
-        if (!attendanceDates.includes(newDate)) {
-            setAttendanceDates([...attendanceDates, newDate].sort());
-            setNewDate('');
-        }
-    };
-
-    const removeAttendanceDate = (date: string) => {
-        setAttendanceDates(attendanceDates.filter(d => d !== date));
+        return {};
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -106,21 +114,34 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
                 </div>
                 <div className="space-y-2">
                     <label className="block font-semibold text-gray-700">الدرجة العلمية</label>
-                    <input
-                        type="text"
+                    <select
                         value={degree}
-                        onChange={(e) => setDegree(e.target.value)}
-                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
+                        onChange={handleDegreeChange}
+                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    >
+                        <option value="">اختر الدرجة العلمية</option>
+                        <option value="أستاذ متفرغ">أستاذ متفرغ</option>
+                        <option value="أستاذ">أستاذ</option>
+                        <option value="أستاذ مساعد">أستاذ مساعد</option>
+                        <option value="مدرس">مدرس</option>
+                        <option value="مدرس مساعد">مدرس مساعد</option>
+                        <option value="معيد">معيد</option>
+                        <option value="مهندس حر">مهندس حر</option>
+                    </select>
                 </div>
                 <div className="space-y-2">
                     <label className="block font-semibold text-gray-700">القسم</label>
-                    <input
-                        type="text"
+                    <select
                         value={department}
                         onChange={(e) => setDepartment(e.target.value)}
-                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
+                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    >
+                        <option value="">اختر القسم</option>
+                        <option value="الهندسة المدنية">الهندسة المدنية</option>
+                        <option value="الهندسة المعمارية">الهندسة المعمارية</option>
+                        <option value="الهندسة الكهربية (شعبة هندسة الاتصالات والإلكترونيات الكهربية)">الهندسة الكهربية (شعبة هندسة الاتصالات والإلكترونيات الكهربية)</option>
+                        <option value="الهندسة الكهربية (شعبة هندسة الحاسبات والتحكم الالي)">الهندسة الكهربية (شعبة هندسة الحاسبات والتحكم الالي)</option>
+                    </select>
                 </div>
                 <div className="space-y-2">
                     <label className="block font-semibold text-gray-700">جهة العمل / الانتداب</label>
@@ -153,8 +174,9 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
                                             type="number"
                                             value={item.theoretical}
                                             onChange={(e) => handleScheduleChange(index, 'theoretical', parseFloat(e.target.value) || 0)}
-                                            className="w-full p-1 text-center border rounded"
+                                            className={`w-full p-1 text-center border rounded ${isTheoreticalDisabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                             min="0"
+                                            disabled={isTheoreticalDisabled}
                                         />
                                     </td>
                                     <td className="border p-2">
@@ -176,20 +198,22 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
             <div className="space-y-4">
                 <h3 className="text-xl font-bold text-gray-800 border-b pb-2">تواريخ الحضور الفعلي</h3>
                 <div className="flex flex-col gap-2">
-                    <div className="flex gap-2">
-                        <input
-                            type="date"
-                            value={newDate}
-                            onChange={(e) => setNewDate(e.target.value)}
-                            className="flex-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    <div className="flex gap-2 items-center">
+                        <DatePicker
+                            multiple
+                            value={attendanceDates}
+                            onChange={(dateObjects: DateObject[]) => {
+                                setError('');
+                                setAttendanceDates(dateObjects.map(d => d.format("YYYY-MM-DD")));
+                            }}
+                            format="YYYY-MM-DD"
+                            minDate={minDate}
+                            maxDate={maxDate}
+                            mapDays={mapDays}
+                            placeholder="اختر تواريخ الحضور"
+                            inputClass="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-right"
+                            containerClassName="w-full"
                         />
-                        <button
-                            type="button"
-                            onClick={addAttendanceDate}
-                            className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 flex items-center gap-1"
-                        >
-                            <Plus size={20} /> إضافة تاريخ
-                        </button>
                     </div>
                     {error && (
                         <p className="text-red-600 text-sm font-bold bg-red-50 p-2 rounded border border-red-100 animate-pulse">
