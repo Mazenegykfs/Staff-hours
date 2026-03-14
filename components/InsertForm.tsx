@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StaffRecord, WeeklySchedule } from '../types';
 import { ORDERED_ARABIC_DAYS, EMPLOYER_OPTIONS } from '../constants';
 import { Plus, Trash2, Save, X } from 'lucide-react';
 import DatePicker, { DateObject } from "react-multi-date-picker";
+import { computeReportData, displayValueOrDash } from '../utils/reportLogic';
 
 interface InsertFormProps {
     onSave: (record: StaffRecord) => void;
@@ -51,6 +52,30 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
         setAttendanceDates(attendanceDates.filter(d => d !== date));
     };
 
+    useEffect(() => {
+        setAttendanceDates(prevDates => {
+            const validDates = prevDates.filter(dateStr => {
+                const jsDate = new Date(dateStr);
+                const dayName = jsDate.toLocaleDateString('ar-EG', { weekday: 'long' });
+                const normalizedDay = ORDERED_ARABIC_DAYS.find(d => 
+                    dayName.includes(d) || d.includes(dayName)
+                ) || dayName;
+
+                const scheduledDay = weeklySchedule.find(s => s.day === normalizedDay);
+                
+                if (scheduledDay && (scheduledDay.theoretical > 0 || scheduledDay.practical > 0)) {
+                    return true;
+                }
+                return false;
+            });
+
+            if (validDates.length !== prevDates.length) {
+                return validDates;
+            }
+            return prevDates;
+        });
+    }, [weeklySchedule]);
+
     const today = new Date();
     const minDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
     const maxDate = new Date(today.getFullYear(), today.getMonth() + 3, 0);
@@ -91,6 +116,17 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
         };
         onSave(record);
     };
+
+    const currentRecord: StaffRecord = {
+        id: initialData?.id || '',
+        name,
+        degree,
+        department,
+        employer,
+        weeklySchedule,
+        attendanceDates
+    };
+    const reportData = computeReportData(currentRecord);
 
     return (
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-lg space-y-6 max-w-4xl mx-auto" dir="rtl">
@@ -245,6 +281,41 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
                         <p className="text-gray-500 italic">لم يتم إضافة تواريخ بعد</p>
                     )}
                 </div>
+
+                {attendanceDates.length > 0 && (
+                    <div className="mt-6">
+                        <h4 className="text-lg font-bold text-gray-800 mb-3">عدد أيام الحضور الفعلي شهريا</h4>
+                        <div className="overflow-x-auto">
+                            <table className="w-full border-collapse text-center text-sm">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th className="border p-2">م</th>
+                                        <th className="border p-2">تاريخ الحضور</th>
+                                        <th className="border p-2">اليوم</th>
+                                        <th className="border p-2">نظري</th>
+                                        <th className="border p-2">عملي</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {reportData.attendanceDates.map((att, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="border p-2">{displayValueOrDash(att.serial)}</td>
+                                            <td className="border p-2">{displayValueOrDash(att.date)}</td>
+                                            <td className="border p-2">{displayValueOrDash(att.day)}</td>
+                                            <td className="border p-2">{displayValueOrDash(att.theoretical)}</td>
+                                            <td className="border p-2">{displayValueOrDash(att.practical)}</td>
+                                        </tr>
+                                    ))}
+                                    <tr className="bg-gray-50 font-bold">
+                                        <td colSpan={3} className="border p-2 text-left">إجمالي الساعات الفعلية</td>
+                                        <td className="border p-2">{displayValueOrDash(reportData.totalTheoreticalHoursAttendance)}</td>
+                                        <td className="border p-2">{displayValueOrDash(reportData.totalPracticalHoursAttendance)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="flex justify-end gap-3 pt-6 border-t">

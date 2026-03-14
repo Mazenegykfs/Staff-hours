@@ -167,7 +167,7 @@ const generateReportChildren = (record: StaffRecord, deanName: string, clerkName
 
         // Attendance Table
         new Paragraph({
-            children: [new TextRun({ text: "عدد أيام الغياب والحضور الفعلي شهريا", bold: true, rightToLeft: true, font: "Arial", size: 28 })],
+            children: [new TextRun({ text: "عدد أيام الحضور الفعلي شهريا", bold: true, rightToLeft: true, font: "Arial", size: 28 })],
             alignment: AlignmentType.CENTER,
             bidirectional: true,
             spacing: { after: 100 }

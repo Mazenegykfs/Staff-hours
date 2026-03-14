@@ -137,7 +137,7 @@ export const Report: React.FC<ReportProps> = ({ recordData }) => {
             </section>
             
             <section className="mb-2">
-                <h4 className="text-sm font-bold text-gray-800 mb-1 text-center">عدد أيام الغياب والحضور الفعلي شهريا</h4>
+                <h4 className="text-sm font-bold text-gray-800 mb-1 text-center">عدد أيام الحضور الفعلي شهريا</h4>
                 <table className="w-full border-collapse text-center text-[11px] sm:text-[12px]">
                     <thead className="bg-gray-100">
                         <tr>
