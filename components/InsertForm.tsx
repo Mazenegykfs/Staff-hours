@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { StaffRecord, WeeklySchedule } from '../types';
-import { ORDERED_ARABIC_DAYS } from '../constants';
+import { ORDERED_ARABIC_DAYS, EMPLOYER_OPTIONS } from '../constants';
 import { Plus, Trash2, Save, X } from 'lucide-react';
 import DatePicker, { DateObject } from "react-multi-date-picker";
 
@@ -150,8 +150,14 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
                         type="text"
                         value={employer}
                         onChange={(e) => setEmployer(e.target.value)}
+                        list="employer-options"
                         className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     />
+                    <datalist id="employer-options">
+                        {EMPLOYER_OPTIONS.map((option, index) => (
+                            <option key={index} value={option} />
+                        ))}
+                    </datalist>
                 </div>
             </div>
 
