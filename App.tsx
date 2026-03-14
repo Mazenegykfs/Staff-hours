@@ -77,16 +77,18 @@ const PrintableReport = ({ record }: { record: StaffRecord }) => {
                 setTimeout(() => {
                     if (innerRef.current) {
                         const height = innerRef.current.offsetHeight;
-                        // A4 height at 96dpi is ~1123px. With margins, safe height is ~980px to avoid bottom clipping.
-                        const targetHeight = 980; 
+                        // A4 height at 96dpi is ~1123px. With margins, safe height is ~1020px to avoid bottom clipping.
+                        const targetHeight = 1020; 
                         
                         if (height > targetHeight) {
                             const newScale = targetHeight / height;
                             setScale(newScale);
-                            setWrapperHeight(height * newScale + 20); // Add 20px buffer to prevent clipping
+                            setWrapperHeight(targetHeight);
+                        } else {
+                            setWrapperHeight(height);
                         }
                     }
-                }, 50);
+                }, 100);
             }
         };
 
@@ -94,12 +96,12 @@ const PrintableReport = ({ record }: { record: StaffRecord }) => {
     }, [record]);
 
     return (
-        <div style={{ height: wrapperHeight, overflow: 'hidden' }} className="w-full">
+        <div style={{ height: wrapperHeight, overflow: 'hidden', pageBreakInside: 'avoid' }} className="w-full">
             <div 
                 ref={innerRef} 
                 style={{ 
                     transform: `scale(${scale})`, 
-                    transformOrigin: 'top center',
+                    transformOrigin: 'top right',
                     width: '100%'
                 }}
             >
@@ -246,7 +248,9 @@ const App: React.FC = () => {
         html2canvas: { 
             scale: 2, 
             useCORS: true, 
-            letterRendering: true
+            letterRendering: true,
+            scrollY: 0,
+            windowWidth: 756 // 200mm at 96dpi (A4 width minus margins)
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'avoid-all'] }
@@ -414,16 +418,17 @@ const App: React.FC = () => {
         <div className="bg-gray-50 min-h-screen text-gray-800 p-4 sm:p-8" style={{ fontFamily: "'Cairo', sans-serif" }} dir="rtl">
             {/* Hidden container for single printing */}
             <div 
+                dir="ltr"
                 style={{ 
                     position: 'absolute', 
                     top: 0, 
                     left: 0, 
-                    width: '210mm',
+                    width: '756px', // A4 width minus margins (200mm at 96dpi)
                     zIndex: 40,
                     display: printingSingleId ? 'block' : 'none'
                 }}
             >
-                <div ref={singleReportRef} className="bg-white">
+                <div ref={singleReportRef} className="bg-white w-full" dir="rtl">
                     {printingSingleId && (
                         <PrintableReport record={allRecords.find(r => r.id === printingSingleId)!} />
                     )}
@@ -432,18 +437,19 @@ const App: React.FC = () => {
 
             {/* Hidden container for bulk printing */}
             <div 
+                dir="ltr"
                 style={{ 
                     position: 'absolute', 
                     top: 0, 
                     left: 0, 
-                    width: '210mm', // A4 width
+                    width: '756px', // A4 width minus margins (200mm at 96dpi)
                     zIndex: 40,
                     display: isPrintingAll ? 'block' : 'none'
                 }}
             >
-                <div ref={allReportsRef} className="bg-white">
+                <div ref={allReportsRef} className="bg-white w-full" dir="rtl">
                     {isPrintingAll && allRecords.map((record, index) => (
-                        <div key={record.id} className={index < allRecords.length - 1 ? "pdf-page-break" : ""}>
+                        <div key={record.id} className={index < allRecords.length - 1 ? "pdf-page-break w-full" : "w-full"}>
                             <PrintableReport record={record} />
                         </div>
                     ))}
@@ -742,7 +748,7 @@ const App: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        <div ref={reportContainerRef}>
+                        <div ref={reportContainerRef} className="rounded-xl shadow-lg my-2 max-w-4xl mx-auto overflow-hidden">
                             <Report recordData={selectedRecord} />
                         </div>
                     </div>

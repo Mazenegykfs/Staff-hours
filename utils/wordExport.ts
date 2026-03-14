@@ -315,8 +315,8 @@ const fetchImageAsArrayBuffer = async (url: string): Promise<ArrayBuffer | null>
 };
 
 export const exportToDocx = async (record: StaffRecord, deanName: string, clerkName: string, secretaryName: string, reportTitle: string) => {
-    const ministryLogoBuffer = await fetchImageAsArrayBuffer("https://api.allorigins.win/raw?url=https%3A%2F%2Fyt3.googleusercontent.com%2Fp-gOwvpL7qWfqZ0XAC-zsuWXg4ATxIxGCYtGtbsSSh2HGogCeFX17SaueyejOtnJywe32_93FQ%3Ds160-c-k-c0x00ffffff-no-rj");
-    const kfsLogoBuffer = await fetchImageAsArrayBuffer("https://api.allorigins.win/raw?url=https%3A%2F%2Fencrypted-tbn0.gstatic.com%2Fimages%3Fq%3Dtbn%3AANd9GcTkwEB_T_tTBcOVvP7OZtXjcLH0txqZK902Qg%26s");
+    const ministryLogoBuffer = await fetchImageAsArrayBuffer("https://images.weserv.nl/?url=yt3.googleusercontent.com/p-gOwvpL7qWfqZ0XAC-zsuWXg4ATxIxGCYtGtbsSSh2HGogCeFX17SaueyejOtnJywe32_93FQ=s160-c-k-c0x00ffffff-no-rj");
+    const kfsLogoBuffer = await fetchImageAsArrayBuffer("https://images.weserv.nl/?url=encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTkwEB_T_tTBcOVvP7OZtXjcLH0txqZK902Qg&s");
 
     const doc = new Document({
         creator: "Report Generator",
@@ -332,8 +332,8 @@ export const exportToDocx = async (record: StaffRecord, deanName: string, clerkN
 };
 
 export const exportAllToDocx = async (records: StaffRecord[], deanName: string, clerkName: string, secretaryName: string, reportTitle: string) => {
-    const ministryLogoBuffer = await fetchImageAsArrayBuffer("https://api.allorigins.win/raw?url=https%3A%2F%2Fyt3.googleusercontent.com%2Fp-gOwvpL7qWfqZ0XAC-zsuWXg4ATxIxGCYtGtbsSSh2HGogCeFX17SaueyejOtnJywe32_93FQ%3Ds160-c-k-c0x00ffffff-no-rj");
-    const kfsLogoBuffer = await fetchImageAsArrayBuffer("https://api.allorigins.win/raw?url=https%3A%2F%2Fencrypted-tbn0.gstatic.com%2Fimages%3Fq%3Dtbn%3AANd9GcTkwEB_T_tTBcOVvP7OZtXjcLH0txqZK902Qg%26s");
+    const ministryLogoBuffer = await fetchImageAsArrayBuffer("https://images.weserv.nl/?url=yt3.googleusercontent.com/p-gOwvpL7qWfqZ0XAC-zsuWXg4ATxIxGCYtGtbsSSh2HGogCeFX17SaueyejOtnJywe32_93FQ=s160-c-k-c0x00ffffff-no-rj");
+    const kfsLogoBuffer = await fetchImageAsArrayBuffer("https://images.weserv.nl/?url=encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTkwEB_T_tTBcOVvP7OZtXjcLH0txqZK902Qg&s");
 
     const allChildren: any[] = [];
     

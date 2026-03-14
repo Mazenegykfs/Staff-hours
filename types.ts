@@ -23,4 +23,5 @@ export interface StaffRecord {
 
 export interface ReportProps {
     recordData: StaffRecord;
+    isPrintMode?: boolean;
 }
