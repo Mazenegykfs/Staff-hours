@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Report } from './components/Report';
 import { InsertForm } from './components/InsertForm';
 import { StaffRecord } from './types';
-import { Plus, Printer, FileText, Trash2, Edit, List, LogIn, LogOut, User as UserIcon, PenTool, Download } from 'lucide-react';
+import { Plus, Printer, FileText, Trash2, Edit, List, LogIn, LogOut, User as UserIcon, PenTool, Download, Calendar } from 'lucide-react';
 import ReactDOM from 'react-dom/client';
 import { auth, db, loginWithGoogle, logout, onAuthStateChanged, User } from './firebase';
 import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
@@ -121,6 +121,9 @@ const App: React.FC = () => {
     const [isPrintingAll, setIsPrintingAll] = useState<boolean>(false);
     const [printingSingleId, setPrintingSingleId] = useState<string>('');
     const [isEditingSignatures, setIsEditingSignatures] = useState<boolean>(false);
+    const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
+    const [customTitle, setCustomTitle] = useState<string>(localStorage.getItem('customReportTitle') || '');
+    const [tempTitle, setTempTitle] = useState<string>('');
     const [signatureData, setSignatureData] = useState({
         deanName: localStorage.getItem('deanName') || 'أ.د. مصطفى كامل',
         clerkName: localStorage.getItem('clerkName') || 'الاسم',
@@ -339,8 +342,9 @@ const App: React.FC = () => {
             const deanName = localStorage.getItem('deanName') || 'أ.د. مصطفى كامل';
             const clerkName = localStorage.getItem('clerkName') || 'الاسم';
             const secretaryName = localStorage.getItem('secretaryName') || 'الاسم';
+            const reportTitle = localStorage.getItem('customReportTitle') || '';
             
-            await exportToDocx(selectedRecord, deanName, clerkName, secretaryName);
+            await exportToDocx(selectedRecord, deanName, clerkName, secretaryName, reportTitle);
             setMessage('تم تصدير ملف Word بنجاح.');
             setTimeout(() => setMessage(''), 3000);
         } catch (error: any) {
@@ -355,8 +359,9 @@ const App: React.FC = () => {
             const deanName = localStorage.getItem('deanName') || 'أ.د. مصطفى كامل';
             const clerkName = localStorage.getItem('clerkName') || 'الاسم';
             const secretaryName = localStorage.getItem('secretaryName') || 'الاسم';
+            const reportTitle = localStorage.getItem('customReportTitle') || '';
             
-            await exportAllToDocx(allRecords, deanName, clerkName, secretaryName);
+            await exportAllToDocx(allRecords, deanName, clerkName, secretaryName, reportTitle);
             setMessage('تم تصدير جميع التقارير في ملف Word بنجاح.');
             setTimeout(() => setMessage(''), 3000);
         } catch (error: any) {
@@ -387,6 +392,21 @@ const App: React.FC = () => {
         
         setIsEditingSignatures(false);
         setMessage('تم حفظ التوقيعات بنجاح');
+        setTimeout(() => setMessage(''), 3000);
+    };
+
+    const handleEditTitle = () => {
+        setTempTitle(customTitle);
+        setIsEditingTitle(true);
+    };
+
+    const handleSaveTitle = () => {
+        setCustomTitle(tempTitle);
+        localStorage.setItem('customReportTitle', tempTitle);
+        window.dispatchEvent(new CustomEvent('sharedStateChange', { detail: { key: 'customReportTitle', value: tempTitle } }));
+        
+        setIsEditingTitle(false);
+        setMessage('تم حفظ عنوان التقرير بنجاح');
         setTimeout(() => setMessage(''), 3000);
     };
 
@@ -494,6 +514,41 @@ const App: React.FC = () => {
                 </div>
             )}
 
+            {isEditingTitle && (
+                <div className="fixed inset-0 bg-black/50 flex flex-col justify-center items-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md" dir="rtl">
+                        <h2 className="text-xl font-bold text-gray-800 mb-4">تحديد الشهر (عنوان التقرير)</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">عنوان التقرير</label>
+                                <input 
+                                    type="text" 
+                                    value={tempTitle}
+                                    onChange={(e) => setTempTitle(e.target.value)}
+                                    placeholder="مثال: استمارة شهر مارس 2026-2025م"
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:blue-500 focus:border-blue-500"
+                                />
+                                <p className="text-xs text-gray-500 mt-2">اترك الحقل فارغاً للعودة للعنوان الافتراضي التلقائي.</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button 
+                                onClick={() => setIsEditingTitle(false)}
+                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                إلغاء
+                            </button>
+                            <button 
+                                onClick={handleSaveTitle}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                            >
+                                حفظ التغييرات
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <header className="bg-blue-600 text-white p-4 rounded-xl shadow-lg mb-8">
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <h1 className="text-xl sm:text-2xl font-bold text-center sm:text-right">
@@ -558,6 +613,12 @@ const App: React.FC = () => {
                         className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-all ${view === 'insert' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
                     >
                         <Plus size={20} /> إضافة جديد
+                    </button>
+                    <button
+                        onClick={handleEditTitle}
+                        className="flex items-center gap-2 px-6 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition-all shadow-sm border border-gray-200"
+                    >
+                        <Calendar size={20} /> تحديد الشهر
                     </button>
                     {allRecords.length > 0 && (
                         <div className="flex gap-2">

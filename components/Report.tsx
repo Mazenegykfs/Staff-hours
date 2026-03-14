@@ -49,6 +49,7 @@ export const Report: React.FC<ReportProps> = ({ recordData }) => {
     const [deanName, setDeanName] = useSharedState("deanName", "أ.د. مصطفى كامل");
     const [clerkName, setClerkName] = useSharedState("clerkName", "الاسم");
     const [secretaryName, setSecretaryName] = useSharedState("secretaryName", "الاسم");
+    const [customTitle, setCustomTitle] = useSharedState("customReportTitle", "");
 
     const reportData = useMemo(() => computeReportData(recordData), [recordData]);
     const { isFacultyMember } = reportData;
@@ -68,7 +69,9 @@ export const Report: React.FC<ReportProps> = ({ recordData }) => {
                             </td>
                             <td className="border-none text-center align-middle w-1/3">
                                 <h4 className="text-sm sm:text-base font-bold text-gray-800 m-0" dir="rtl">
-                                    استمارة شهر {reportData.attendanceMonth} <span dir="ltr" className="inline-block">{reportData.attendanceYearEnd}-{reportData.attendanceYearStart}</span>م
+                                    {customTitle ? customTitle : (
+                                        <>استمارة شهر {reportData.attendanceMonth} <span dir="ltr" className="inline-block">{reportData.attendanceYearEnd}-{reportData.attendanceYearStart}</span>م</>
+                                    )}
                                 </h4>
                             </td>
                             <td className="border-none text-center align-middle w-1/3">

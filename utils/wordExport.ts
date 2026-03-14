@@ -55,9 +55,11 @@ const formatDateForWord = (dateStr: string | number) => {
     return dateStr;
 };
 
-const generateReportChildren = (record: StaffRecord, deanName: string, clerkName: string, secretaryName: string, addPageBreak: boolean, ministryLogoBuffer: ArrayBuffer | null, kfsLogoBuffer: ArrayBuffer | null) => {
+const generateReportChildren = (record: StaffRecord, deanName: string, clerkName: string, secretaryName: string, reportTitle: string, addPageBreak: boolean, ministryLogoBuffer: ArrayBuffer | null, kfsLogoBuffer: ArrayBuffer | null) => {
     const reportData = computeReportData(record);
     
+    const finalTitle = reportTitle || `استمارة شهر ${reportData.attendanceMonth} ${reportData.attendanceYearEnd}-${reportData.attendanceYearStart}م`;
+
     const children = [
         // Header
         new Table({
@@ -84,7 +86,7 @@ const generateReportChildren = (record: StaffRecord, deanName: string, clerkName
                         }),
                         new TableCell({
                             children: [
-                                new Paragraph({ children: [new TextRun({ text: `استمارة شهر ${reportData.attendanceMonth} ${reportData.attendanceYearEnd}-${reportData.attendanceYearStart}م`, bold: true, rightToLeft: true, font: "Arial", size: 28 })], alignment: AlignmentType.CENTER, bidirectional: true }),
+                                new Paragraph({ children: [new TextRun({ text: finalTitle, bold: true, rightToLeft: true, font: "Arial", size: 28 })], alignment: AlignmentType.CENTER, bidirectional: true }),
                             ],
                             width: { size: 34, type: WidthType.PERCENTAGE },
                             verticalAlign: VerticalAlign.CENTER,
@@ -312,7 +314,7 @@ const fetchImageAsArrayBuffer = async (url: string): Promise<ArrayBuffer | null>
     }
 };
 
-export const exportToDocx = async (record: StaffRecord, deanName: string, clerkName: string, secretaryName: string) => {
+export const exportToDocx = async (record: StaffRecord, deanName: string, clerkName: string, secretaryName: string, reportTitle: string) => {
     const ministryLogoBuffer = await fetchImageAsArrayBuffer("https://api.allorigins.win/raw?url=https%3A%2F%2Fyt3.googleusercontent.com%2Fp-gOwvpL7qWfqZ0XAC-zsuWXg4ATxIxGCYtGtbsSSh2HGogCeFX17SaueyejOtnJywe32_93FQ%3Ds160-c-k-c0x00ffffff-no-rj");
     const kfsLogoBuffer = await fetchImageAsArrayBuffer("https://api.allorigins.win/raw?url=https%3A%2F%2Fencrypted-tbn0.gstatic.com%2Fimages%3Fq%3Dtbn%3AANd9GcTkwEB_T_tTBcOVvP7OZtXjcLH0txqZK902Qg%26s");
 
@@ -321,7 +323,7 @@ export const exportToDocx = async (record: StaffRecord, deanName: string, clerkN
         title: `تقرير ${record.name}`,
         sections: [{
             properties: {},
-            children: generateReportChildren(record, deanName, clerkName, secretaryName, false, ministryLogoBuffer, kfsLogoBuffer),
+            children: generateReportChildren(record, deanName, clerkName, secretaryName, reportTitle, false, ministryLogoBuffer, kfsLogoBuffer),
         }],
     });
 
@@ -329,7 +331,7 @@ export const exportToDocx = async (record: StaffRecord, deanName: string, clerkN
     saveAs(blob, `تقرير_${record.name.replace(/\s/g, '_')}.docx`);
 };
 
-export const exportAllToDocx = async (records: StaffRecord[], deanName: string, clerkName: string, secretaryName: string) => {
+export const exportAllToDocx = async (records: StaffRecord[], deanName: string, clerkName: string, secretaryName: string, reportTitle: string) => {
     const ministryLogoBuffer = await fetchImageAsArrayBuffer("https://api.allorigins.win/raw?url=https%3A%2F%2Fyt3.googleusercontent.com%2Fp-gOwvpL7qWfqZ0XAC-zsuWXg4ATxIxGCYtGtbsSSh2HGogCeFX17SaueyejOtnJywe32_93FQ%3Ds160-c-k-c0x00ffffff-no-rj");
     const kfsLogoBuffer = await fetchImageAsArrayBuffer("https://api.allorigins.win/raw?url=https%3A%2F%2Fencrypted-tbn0.gstatic.com%2Fimages%3Fq%3Dtbn%3AANd9GcTkwEB_T_tTBcOVvP7OZtXjcLH0txqZK902Qg%26s");
 
@@ -337,7 +339,7 @@ export const exportAllToDocx = async (records: StaffRecord[], deanName: string, 
     
     records.forEach((record, index) => {
         const isLast = index === records.length - 1;
-        const recordChildren = generateReportChildren(record, deanName, clerkName, secretaryName, !isLast, ministryLogoBuffer, kfsLogoBuffer);
+        const recordChildren = generateReportChildren(record, deanName, clerkName, secretaryName, reportTitle, !isLast, ministryLogoBuffer, kfsLogoBuffer);
         allChildren.push(...recordChildren);
     });
 
