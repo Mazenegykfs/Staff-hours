@@ -2,6 +2,17 @@ import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Width
 import { saveAs } from 'file-saver';
 import { StaffRecord } from '../types';
 import { computeReportData, displayValueOrDash, numberToArabicText } from './reportLogic';
+import { ministryLogo, kfsLogo } from './logos';
+
+const base64ToArrayBuffer = (base64: string) => {
+    const binaryString = window.atob(base64.split(',')[1]);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+};
 
 const createCell = (text: string | number, bold = false, shading?: string, colSpan = 1, rowSpan = 1) => {
     return new TableCell({
@@ -211,7 +222,7 @@ const generateReportChildren = (record: StaffRecord, deanName: string, clerkName
         // Totals Text
         new Paragraph({
             children: [
-                new TextRun({ text: `إجمالي ساعات الدرس/الاشراف الفعلية: ${displayValueOrDash(reportData.totalPracticalHoursAttendance)} (${numberToArabicText(reportData.totalPracticalHoursAttendance)}) ساعة`, bold: true, rightToLeft: true, font: "Arial", size: 22 }),
+                new TextRun({ text: `إجمالي ساعات الدرس/الاشراف الفعلية: ${displayValueOrDash(reportData.totalPracticalHoursAttendance)} - ${numberToArabicText(reportData.totalPracticalHoursAttendance)} - ساعة`, bold: true, rightToLeft: true, font: "Arial", size: 22 }),
             ],
             alignment: AlignmentType.RIGHT,
             bidirectional: true,
@@ -219,7 +230,7 @@ const generateReportChildren = (record: StaffRecord, deanName: string, clerkName
         }),
         new Paragraph({
             children: [
-                new TextRun({ text: `إجمالي ساعات المحاضرات الفعلية: ${displayValueOrDash(reportData.totalTheoreticalHoursAttendance)} (${numberToArabicText(reportData.totalTheoreticalHoursAttendance)}) ساعة`, bold: true, rightToLeft: true, font: "Arial", size: 22 }),
+                new TextRun({ text: `إجمالي ساعات المحاضرات الفعلية: ${displayValueOrDash(reportData.totalTheoreticalHoursAttendance)} - ${numberToArabicText(reportData.totalTheoreticalHoursAttendance)} - ساعة`, bold: true, rightToLeft: true, font: "Arial", size: 22 }),
             ],
             alignment: AlignmentType.RIGHT,
             bidirectional: true,
@@ -302,21 +313,9 @@ const generateReportChildren = (record: StaffRecord, deanName: string, clerkName
     return children;
 };
 
-const fetchImageAsArrayBuffer = async (url: string): Promise<ArrayBuffer | null> => {
-    try {
-        const response = await fetch(url);
-        if (!response.ok) return null;
-        const blob = await response.blob();
-        return await blob.arrayBuffer();
-    } catch (e) {
-        console.error("Failed to fetch image", e);
-        return null;
-    }
-};
-
 export const exportToDocx = async (record: StaffRecord, deanName: string, clerkName: string, secretaryName: string, reportTitle: string) => {
-    const ministryLogoBuffer = await fetchImageAsArrayBuffer("https://images.weserv.nl/?url=yt3.googleusercontent.com/p-gOwvpL7qWfqZ0XAC-zsuWXg4ATxIxGCYtGtbsSSh2HGogCeFX17SaueyejOtnJywe32_93FQ=s160-c-k-c0x00ffffff-no-rj");
-    const kfsLogoBuffer = await fetchImageAsArrayBuffer("https://images.weserv.nl/?url=encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTkwEB_T_tTBcOVvP7OZtXjcLH0txqZK902Qg&s");
+    const ministryLogoBuffer = base64ToArrayBuffer(ministryLogo);
+    const kfsLogoBuffer = base64ToArrayBuffer(kfsLogo);
 
     const doc = new Document({
         creator: "Report Generator",
@@ -332,8 +331,8 @@ export const exportToDocx = async (record: StaffRecord, deanName: string, clerkN
 };
 
 export const exportAllToDocx = async (records: StaffRecord[], deanName: string, clerkName: string, secretaryName: string, reportTitle: string) => {
-    const ministryLogoBuffer = await fetchImageAsArrayBuffer("https://images.weserv.nl/?url=yt3.googleusercontent.com/p-gOwvpL7qWfqZ0XAC-zsuWXg4ATxIxGCYtGtbsSSh2HGogCeFX17SaueyejOtnJywe32_93FQ=s160-c-k-c0x00ffffff-no-rj");
-    const kfsLogoBuffer = await fetchImageAsArrayBuffer("https://images.weserv.nl/?url=encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTkwEB_T_tTBcOVvP7OZtXjcLH0txqZK902Qg&s");
+    const ministryLogoBuffer = base64ToArrayBuffer(ministryLogo);
+    const kfsLogoBuffer = base64ToArrayBuffer(kfsLogo);
 
     const allChildren: any[] = [];
     

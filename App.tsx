@@ -8,6 +8,8 @@ import ReactDOM from 'react-dom/client';
 import { auth, db, loginWithGoogle, logout, onAuthStateChanged, User } from './firebase';
 import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { exportToDocx, exportAllToDocx } from './utils/wordExport';
+import { exportRecordsToExcel, importRecordsFromExcel } from './utils/excelUtils';
+import { Upload } from 'lucide-react';
 
 declare var html2pdf: any;
 
@@ -96,12 +98,13 @@ const PrintableReport = ({ record }: { record: StaffRecord }) => {
     }, [record]);
 
     return (
-        <div style={{ height: wrapperHeight, overflow: 'hidden', pageBreakInside: 'avoid' }} className="w-full">
+        <div dir="ltr" style={{ height: wrapperHeight, overflow: 'hidden', pageBreakInside: 'avoid', display: 'flex', justifyContent: 'flex-start' }} className="w-full">
             <div 
                 ref={innerRef} 
+                dir="rtl"
                 style={{ 
                     transform: `scale(${scale})`, 
-                    transformOrigin: 'top right',
+                    transformOrigin: 'top left',
                     width: '100%'
                 }}
             >
@@ -131,6 +134,7 @@ const App: React.FC = () => {
         clerkName: localStorage.getItem('clerkName') || 'الاسم',
         secretaryName: localStorage.getItem('secretaryName') || 'الاسم'
     });
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const reportContainerRef = useRef<HTMLDivElement>(null);
     const allReportsRef = useRef<HTMLDivElement>(null);
     const singleReportRef = useRef<HTMLDivElement>(null);
@@ -264,6 +268,85 @@ const App: React.FC = () => {
         await handlePrintSingleFromList(selectedRecord);
     };
     
+    const handleExportExcel = () => {
+        if (allRecords.length === 0) {
+            setMessage('لا توجد سجلات لتصديرها');
+            setTimeout(() => setMessage(''), 3000);
+            return;
+        }
+        exportRecordsToExcel(allRecords);
+        setMessage('تم تصدير البيانات بنجاح');
+        setTimeout(() => setMessage(''), 3000);
+    };
+
+    const handleImportExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!user) {
+            setMessage('يرجى تسجيل الدخول أولاً لتتمكن من استيراد البيانات وحفظها.');
+            setTimeout(() => setMessage(''), 5000);
+            if (event.target) event.target.value = '';
+            return;
+        }
+
+        setIsLoading(true);
+        setMessage('جاري استبدال البيانات...');
+        try {
+            const importedRecords = await importRecordsFromExcel(file);
+            
+            if (importedRecords.length === 0) {
+                setMessage('الملف فارغ أو غير صالح');
+                setIsLoading(false);
+                setTimeout(() => setMessage(''), 3000);
+                return;
+            }
+
+            // 1. Delete existing records for this user first to perform a "replace"
+            for (const record of allRecords) {
+                try {
+                    await deleteDoc(doc(db, 'staff_records', record.id));
+                } catch (err) {
+                    console.error('Error deleting old record:', err);
+                }
+            }
+
+            // 2. Save each record from the file to Firestore
+            let successCount = 0;
+            for (const record of importedRecords) {
+                try {
+                    // We generate a new ID to ensure clean state, but we could also keep the old one if it exists in the file
+                    // However, generating a new one is safer for a "fresh" replace
+                    const newId = doc(collection(db, 'staff_records')).id;
+                    
+                    const { id: _oldId, uid: _oldUid, ...recordData } = record;
+                    
+                    const recordToSave = {
+                        ...recordData,
+                        id: newId,
+                        uid: user.uid,
+                        createdAt: serverTimestamp()
+                    };
+                    
+                    const docRef = doc(db, 'staff_records', newId);
+                    await setDoc(docRef, recordToSave);
+                    successCount++;
+                } catch (err) {
+                    console.error('Error saving record:', err);
+                }
+            }
+
+            setMessage(`تم استبدال البيانات بنجاح. تم استيراد ${successCount} سجل.`);
+        } catch (error) {
+            console.error('Import error:', error);
+            setMessage('حدث خطأ أثناء استيراد البيانات. يرجى التأكد من صحة الملف وتنسيقه.');
+        } finally {
+            setIsLoading(false);
+            setTimeout(() => setMessage(''), 5000);
+            if (event.target) event.target.value = '';
+        }
+    };
+
     const handlePrintAllReports = async () => {
         if (allRecords.length === 0) {
             setMessage('لا توجد سجلات لطباعتها.');
@@ -626,8 +709,23 @@ const App: React.FC = () => {
                     >
                         <Calendar size={20} /> تحديد الشهر
                     </button>
+                    
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-2 px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-all shadow-md"
+                    >
+                        <Upload size={20} /> استيراد Excel
+                    </button>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleImportExcel} 
+                        accept=".xlsx, .xls" 
+                        className="hidden" 
+                    />
+
                     {allRecords.length > 0 && (
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2 justify-center">
                             <button
                                 onClick={handlePrintAllReports}
                                 className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-md"
@@ -639,6 +737,12 @@ const App: React.FC = () => {
                                 className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md"
                             >
                                 <Download size={20} /> تصدير الكل (Word)
+                            </button>
+                            <button
+                                onClick={handleExportExcel}
+                                className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-md"
+                            >
+                                <Download size={20} /> تصدير Excel
                             </button>
                         </div>
                     )}
