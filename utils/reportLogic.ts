@@ -7,12 +7,35 @@ export const displayValueOrDash = (value: any): string => {
     return String(value);
 };
 
+export const getHourWord = (num: number): string => {
+    if (num === 1) return 'ساعة';
+    if (num === 2) return 'ساعتان';
+    if (num >= 3 && num <= 10) return 'ساعات';
+    return 'ساعة';
+};
+
 export const numberToArabicText = (num: number): string => {
-    const arabicNumbers = ['صفر', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة', 'عشرة'];
-    if (num >= 0 && num <= 10) {
-        return arabicNumbers[num];
+    if (num === 0) return 'صفر';
+    
+    const ones = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
+    const tens = ['', 'عشرة', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
+    const teens = ['عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
+
+    if (num < 10) {
+        return ones[num];
+    } else if (num >= 10 && num < 20) {
+        return teens[num - 10];
+    } else if (num >= 20 && num < 100) {
+        const one = num % 10;
+        const ten = Math.floor(num / 10);
+        if (one === 0) {
+            return tens[ten];
+        } else {
+            return `${ones[one]} و${tens[ten]}`;
+        }
     }
-    return String(num); // Fallback for larger numbers
+    
+    return String(num); // Fallback for numbers >= 100
 };
 
 export const computeReportData = (record: StaffRecord) => {

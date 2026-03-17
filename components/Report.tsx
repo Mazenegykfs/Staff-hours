@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { StaffRecord, ReportProps } from '../types';
-import { numberToArabicText, displayValueOrDash, computeReportData } from '../utils/reportLogic';
+import { numberToArabicText, displayValueOrDash, computeReportData, getHourWord } from '../utils/reportLogic';
 import { ministryLogo, kfsLogo } from '../utils/logos';
 
 // Declare XLSX on the window object to satisfy TypeScript since it's loaded from a CDN
@@ -57,7 +57,7 @@ export const Report: React.FC<ReportProps> = ({ recordData }) => {
 
 
     return (
-        <div dir="rtl" className="bg-white p-3 sm:p-5 pb-12 sm:pb-16 report-container-for-print text-[14px] sm:text-[16px] font-bold leading-[1.4] w-full max-w-[756px] mr-auto ml-0">
+        <div dir="rtl" className="bg-white p-3 sm:p-5 pb-12 sm:pb-16 report-container-for-print text-[14px] sm:text-[16px] font-bold leading-[1.4] w-full max-w-[794px] mx-auto">
             <header className="mb-2">
                 <table className="w-full border-none mb-2 word-table-layout">
                     <tbody>
@@ -176,13 +176,13 @@ export const Report: React.FC<ReportProps> = ({ recordData }) => {
                      <strong>إجمالي ساعات الدرس/الاشراف الفعلية:</strong>
                      <span className="inline-block" dir="ltr">{displayValueOrDash(reportData.totalPracticalHoursAttendance)}</span>
                      <span>- {numberToArabicText(reportData.totalPracticalHoursAttendance)} -</span>
-                     <span>ساعة</span>
+                     <span>{getHourWord(reportData.totalPracticalHoursAttendance)}</span>
                  </div>
                  <div className="flex flex-wrap items-center justify-start gap-1">
                      <strong>إجمالي ساعات المحاضرات الفعلية:</strong>
                      <span className="inline-block" dir="ltr">{displayValueOrDash(reportData.totalTheoreticalHoursAttendance)}</span>
                      <span>- {numberToArabicText(reportData.totalTheoreticalHoursAttendance)} -</span>
-                     <span>ساعة</span>
+                     <span>{getHourWord(reportData.totalTheoreticalHoursAttendance)}</span>
                  </div>
             </section>
 

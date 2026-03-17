@@ -101,7 +101,7 @@ const PrintableReport = ({ record }: { record: StaffRecord }) => {
         <div dir="ltr" style={{ height: wrapperHeight, overflow: 'hidden', pageBreakInside: 'avoid', display: 'flex', justifyContent: 'flex-start' }} className="w-full">
             <div 
                 ref={innerRef} 
-                dir="rtl"
+                dir="ltr"
                 style={{ 
                     transform: `scale(${scale})`, 
                     transformOrigin: 'top left',
@@ -129,6 +129,11 @@ const App: React.FC = () => {
     const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
     const [customTitle, setCustomTitle] = useState<string>(localStorage.getItem('customReportTitle') || '');
     const [tempTitle, setTempTitle] = useState<string>('');
+    const [importModalOpen, setImportModalOpen] = useState(false);
+    const [parsedRecords, setParsedRecords] = useState<(StaffRecord & { tempId: string })[]>([]);
+    const [selectedImportIds, setSelectedImportIds] = useState<Set<string>>(new Set());
+    const [replaceExisting, setReplaceExisting] = useState(false);
+    const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
     const [signatureData, setSignatureData] = useState({
         deanName: localStorage.getItem('deanName') || 'أ.د. مصطفى كامل',
         clerkName: localStorage.getItem('clerkName') || 'الاسم',
@@ -213,22 +218,27 @@ const App: React.FC = () => {
         }
     };
 
-    const handleDeleteRecord = async (id: string) => {
-        if (!user) return;
+    const confirmDeleteRecord = (id: string) => {
+        setRecordToDelete(id);
+    };
+
+    const executeDeleteRecord = async () => {
+        if (!user || !recordToDelete) return;
         
         setIsLoading(true);
         try {
-            await deleteDoc(doc(db, 'staff_records', id));
-            if (selectedStaffId === id) setSelectedStaffId('');
+            await deleteDoc(doc(db, 'staff_records', recordToDelete));
+            if (selectedStaffId === recordToDelete) setSelectedStaffId('');
             setMessage('تم حذف السجل بنجاح');
         } catch (error) {
             try {
-                handleFirestoreError(error, OperationType.DELETE, `staff_records/${id}`);
+                handleFirestoreError(error, OperationType.DELETE, `staff_records/${recordToDelete}`);
             } catch (e) {
                 setMessage('فشل في حذف السجل');
             }
         } finally {
             setIsLoading(false);
+            setRecordToDelete(null);
             setTimeout(() => setMessage(''), 3000);
         }
     };
@@ -246,7 +256,7 @@ const App: React.FC = () => {
     const selectedRecord = allRecords.find(r => r.id === selectedStaffId);
 
     const getPdfOptions = (filename: string) => ({
-        margin: [5, 5, 5, 5],
+        margin: [10, 10, 10, 10], // [top, left, bottom, right]
         filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
@@ -254,7 +264,9 @@ const App: React.FC = () => {
             useCORS: true, 
             letterRendering: true,
             scrollY: 0,
-            windowWidth: 756 // 200mm at 96dpi (A4 width minus margins)
+            scrollX: 0,
+            x: 0,
+            windowWidth: 794 // 210mm at 96dpi (A4 width)
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'avoid-all'] }
@@ -291,7 +303,7 @@ const App: React.FC = () => {
         }
 
         setIsLoading(true);
-        setMessage('جاري استبدال البيانات...');
+        setMessage('جاري قراءة الملف...');
         try {
             const importedRecords = await importRecordsFromExcel(file);
             
@@ -302,29 +314,51 @@ const App: React.FC = () => {
                 return;
             }
 
-            // 1. Delete existing records for this user first to perform a "replace"
-            for (const record of allRecords) {
-                try {
-                    await deleteDoc(doc(db, 'staff_records', record.id));
-                } catch (err) {
-                    console.error('Error deleting old record:', err);
+            const recordsWithTempIds = importedRecords.map((r, i) => ({ ...r, tempId: `temp_${i}` }));
+            setParsedRecords(recordsWithTempIds);
+            setSelectedImportIds(new Set(recordsWithTempIds.map(r => r.tempId)));
+            setImportModalOpen(true);
+            
+        } catch (error) {
+            console.error('Import error:', error);
+            setMessage('حدث خطأ أثناء قراءة الملف. يرجى التأكد من صحة الملف وتنسيقه.');
+        } finally {
+            setIsLoading(false);
+            if (event.target) event.target.value = '';
+        }
+    };
+
+    const confirmImport = async () => {
+        setImportModalOpen(false);
+        setIsLoading(true);
+        setMessage(replaceExisting ? 'جاري استبدال البيانات...' : 'جاري إضافة البيانات...');
+        
+        try {
+            const recordsToImport = parsedRecords.filter(r => selectedImportIds.has(r.tempId));
+            
+            if (replaceExisting) {
+                // Delete existing records for this user first to perform a "replace"
+                for (const record of allRecords) {
+                    try {
+                        await deleteDoc(doc(db, 'staff_records', record.id));
+                    } catch (err) {
+                        console.error('Error deleting old record:', err);
+                    }
                 }
             }
 
-            // 2. Save each record from the file to Firestore
+            // Save each record to Firestore
             let successCount = 0;
-            for (const record of importedRecords) {
+            for (const record of recordsToImport) {
                 try {
-                    // We generate a new ID to ensure clean state, but we could also keep the old one if it exists in the file
-                    // However, generating a new one is safer for a "fresh" replace
                     const newId = doc(collection(db, 'staff_records')).id;
                     
-                    const { id: _oldId, uid: _oldUid, ...recordData } = record;
+                    const { id: _oldId, uid: _oldUid, tempId: _tempId, ...recordData } = record;
                     
                     const recordToSave = {
                         ...recordData,
                         id: newId,
-                        uid: user.uid,
+                        uid: user!.uid,
                         createdAt: serverTimestamp()
                     };
                     
@@ -336,14 +370,15 @@ const App: React.FC = () => {
                 }
             }
 
-            setMessage(`تم استبدال البيانات بنجاح. تم استيراد ${successCount} سجل.`);
+            setMessage(`تم ${replaceExisting ? 'استبدال' : 'إضافة'} البيانات بنجاح. تم استيراد ${successCount} سجل.`);
         } catch (error) {
             console.error('Import error:', error);
-            setMessage('حدث خطأ أثناء استيراد البيانات. يرجى التأكد من صحة الملف وتنسيقه.');
+            setMessage('حدث خطأ أثناء استيراد البيانات.');
         } finally {
             setIsLoading(false);
             setTimeout(() => setMessage(''), 5000);
-            if (event.target) event.target.value = '';
+            setParsedRecords([]);
+            setSelectedImportIds(new Set());
         }
     };
 
@@ -375,12 +410,17 @@ const App: React.FC = () => {
                     });
                 }));
 
+                const originalDir = document.documentElement.dir;
+                document.documentElement.dir = 'ltr';
                 await html2pdf().from(element).set(options).save();
+                document.documentElement.dir = originalDir;
+
                 setMessage('تم إنشاء ملف PDF مجمع بنجاح.');
             } catch (error: any) {
                 console.error('Error generating all PDFs:', error);
                 setMessage(`حدث خطأ أثناء إنشاء ملف PDF: ${error.message}`);
             } finally {
+                document.documentElement.dir = 'rtl'; // Ensure it's reset
                 setIsLoading(false);
                 setIsPrintingAll(false);
                 setTimeout(() => setMessage(''), 3000);
@@ -409,12 +449,17 @@ const App: React.FC = () => {
                     });
                 }));
 
+                const originalDir = document.documentElement.dir;
+                document.documentElement.dir = 'ltr';
                 await html2pdf().from(element).set(options).save();
+                document.documentElement.dir = originalDir;
+
                 setMessage('تم إنشاء ملف PDF بنجاح.');
             } catch (error: any) {
                 console.error('Error generating PDF:', error);
                 setMessage(`حدث خطأ أثناء إنشاء ملف PDF: ${error.message}`);
             } finally {
+                document.documentElement.dir = 'rtl'; // Ensure it's reset
                 setIsLoading(false);
                 setPrintingSingleId('');
                 setTimeout(() => setMessage(''), 3000);
@@ -501,17 +546,16 @@ const App: React.FC = () => {
         <div className="bg-gray-50 min-h-screen text-gray-800 p-4 sm:p-8" style={{ fontFamily: "'Cairo', sans-serif" }} dir="rtl">
             {/* Hidden container for single printing */}
             <div 
-                dir="ltr"
                 style={{ 
                     position: 'absolute', 
                     top: 0, 
                     left: 0, 
-                    width: '756px', // A4 width minus margins (200mm at 96dpi)
+                    width: '794px', // A4 width (210mm at 96dpi)
                     zIndex: 40,
                     display: printingSingleId ? 'block' : 'none'
                 }}
             >
-                <div ref={singleReportRef} className="bg-white w-full" dir="rtl">
+                <div ref={singleReportRef} className="bg-white w-full">
                     {printingSingleId && (
                         <PrintableReport record={allRecords.find(r => r.id === printingSingleId)!} />
                     )}
@@ -520,17 +564,16 @@ const App: React.FC = () => {
 
             {/* Hidden container for bulk printing */}
             <div 
-                dir="ltr"
                 style={{ 
                     position: 'absolute', 
                     top: 0, 
                     left: 0, 
-                    width: '756px', // A4 width minus margins (200mm at 96dpi)
+                    width: '794px', // A4 width (210mm at 96dpi)
                     zIndex: 40,
                     display: isPrintingAll ? 'block' : 'none'
                 }}
             >
-                <div ref={allReportsRef} className="bg-white w-full" dir="rtl">
+                <div ref={allReportsRef} className="bg-white w-full">
                     {isPrintingAll && allRecords.map((record, index) => (
                         <div key={record.id} className={index < allRecords.length - 1 ? "pdf-page-break w-full" : "w-full"}>
                             <PrintableReport record={record} />
@@ -811,7 +854,7 @@ const App: React.FC = () => {
                                                             <Edit size={20} />
                                                         </button>
                                                         <button
-                                                            onClick={() => handleDeleteRecord(record.id)}
+                                                            onClick={() => confirmDeleteRecord(record.id)}
                                                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                                             title="حذف"
                                                         >
@@ -854,6 +897,137 @@ const App: React.FC = () => {
                         </div>
                         <div ref={reportContainerRef} className="rounded-xl shadow-lg my-2 max-w-4xl mx-auto overflow-hidden">
                             <Report recordData={selectedRecord} />
+                        </div>
+                    </div>
+                )}
+
+                {recordToDelete && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col">
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                                <h2 className="text-xl font-bold text-gray-800">تأكيد الحذف</h2>
+                                <button onClick={() => setRecordToDelete(null)} className="text-gray-500 hover:text-gray-700">
+                                    ✕
+                                </button>
+                            </div>
+                            
+                            <div className="p-6">
+                                <p className="text-gray-700">هل أنت متأكد من أنك تريد حذف هذا السجل؟ لا يمكن التراجع عن هذا الإجراء.</p>
+                            </div>
+                            
+                            <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-xl">
+                                <button 
+                                    onClick={() => setRecordToDelete(null)}
+                                    className="px-6 py-2 rounded-lg font-bold text-gray-600 hover:bg-gray-200 transition-colors"
+                                >
+                                    إلغاء
+                                </button>
+                                <button 
+                                    onClick={executeDeleteRecord}
+                                    className="px-6 py-2 rounded-lg font-bold bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center gap-2"
+                                >
+                                    <Trash2 size={20} />
+                                    حذف السجل
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {importModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                                <h2 className="text-2xl font-bold text-gray-800">تحديد السجلات للاستيراد</h2>
+                                <button onClick={() => setImportModalOpen(false)} className="text-gray-500 hover:text-gray-700">
+                                    ✕
+                                </button>
+                            </div>
+                            
+                            <div className="p-6 flex-1 overflow-y-auto">
+                                <div className="mb-4 flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            checked={selectedImportIds.size === parsedRecords.length && parsedRecords.length > 0}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedImportIds(new Set(parsedRecords.map(r => r.tempId)));
+                                                } else {
+                                                    setSelectedImportIds(new Set());
+                                                }
+                                            }}
+                                        />
+                                        <span className="font-bold">تحديد الكل ({parsedRecords.length})</span>
+                                    </label>
+                                    
+                                    <label className="flex items-center gap-2 cursor-pointer text-red-600">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-5 h-5 rounded border-red-300 text-red-600 focus:ring-red-500"
+                                            checked={replaceExisting}
+                                            onChange={(e) => setReplaceExisting(e.target.checked)}
+                                        />
+                                        <span className="font-bold">حذف السجلات الحالية قبل الاستيراد</span>
+                                    </label>
+                                </div>
+                                
+                                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                    <table className="w-full text-right">
+                                        <thead className="bg-gray-50 border-b border-gray-200">
+                                            <tr>
+                                                <th className="p-3 w-12 text-center">تحديد</th>
+                                                <th className="p-3 font-bold text-gray-700">الاسم</th>
+                                                <th className="p-3 font-bold text-gray-700">الدرجة</th>
+                                                <th className="p-3 font-bold text-gray-700">القسم</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {parsedRecords.map(record => (
+                                                <tr key={record.tempId} className="hover:bg-gray-50">
+                                                    <td className="p-3 text-center">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            checked={selectedImportIds.has(record.tempId)}
+                                                            onChange={(e) => {
+                                                                const newSet = new Set(selectedImportIds);
+                                                                if (e.target.checked) {
+                                                                    newSet.add(record.tempId);
+                                                                } else {
+                                                                    newSet.delete(record.tempId);
+                                                                }
+                                                                setSelectedImportIds(newSet);
+                                                            }}
+                                                        />
+                                                    </td>
+                                                    <td className="p-3">{record.name}</td>
+                                                    <td className="p-3">{record.degree}</td>
+                                                    <td className="p-3">{record.department}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-xl">
+                                <button 
+                                    onClick={() => setImportModalOpen(false)}
+                                    className="px-6 py-2 rounded-lg font-bold text-gray-600 hover:bg-gray-200 transition-colors"
+                                >
+                                    إلغاء
+                                </button>
+                                <button 
+                                    onClick={confirmImport}
+                                    disabled={selectedImportIds.size === 0}
+                                    className="px-6 py-2 rounded-lg font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    <Upload size={20} />
+                                    استيراد ({selectedImportIds.size}) سجل
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
