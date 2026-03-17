@@ -2,9 +2,25 @@
 import React, { useState, useEffect } from 'react';
 import { StaffRecord, WeeklySchedule } from '../types';
 import { ORDERED_ARABIC_DAYS, EMPLOYER_OPTIONS } from '../constants';
-import { Plus, Trash2, Save, X } from 'lucide-react';
+import { Plus, Trash2, Save, X, Calendar } from 'lucide-react';
 import DatePicker, { DateObject } from "react-multi-date-picker";
+import gregorian_ar from "react-date-object/locales/gregorian_ar";
 import { computeReportData, displayValueOrDash } from '../utils/reportLogic';
+
+const CustomDatePickerInput = React.forwardRef<HTMLButtonElement, any>((props, ref) => {
+    return (
+        <button
+            type="button"
+            onClick={props.openCalendar}
+            ref={ref}
+            className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 flex items-center gap-2 transition-colors w-full sm:w-auto justify-center"
+        >
+            <Calendar size={20} />
+            <span className="font-medium">اختر تواريخ الحضور</span>
+        </button>
+    );
+});
+CustomDatePickerInput.displayName = "CustomDatePickerInput";
 
 interface InsertFormProps {
     onSave: (record: StaffRecord) => void;
@@ -55,11 +71,12 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
     useEffect(() => {
         setAttendanceDates(prevDates => {
             const validDates = prevDates.filter(dateStr => {
-                const jsDate = new Date(dateStr);
-                const dayName = jsDate.toLocaleDateString('ar-EG', { weekday: 'long' });
-                const normalizedDay = ORDERED_ARABIC_DAYS.find(d => 
-                    dayName.includes(d) || d.includes(dayName)
-                ) || dayName;
+                const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+                const englishDateStr = dateStr.replace(/[٠-٩]/g, w => arabicNumbers.indexOf(w).toString());
+                const [year, month, day] = englishDateStr.split('-').map(Number);
+                const jsDate = new Date(year, month - 1, day);
+                const daysOfWeekArabic = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+                const normalizedDay = daysOfWeekArabic[jsDate.getDay()];
 
                 const scheduledDay = weeklySchedule.find(s => s.day === normalizedDay);
                 
@@ -82,10 +99,8 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
 
     const mapDays = ({ date }: { date: DateObject }) => {
         const jsDate = date.toDate();
-        const dayName = jsDate.toLocaleDateString('ar-EG', { weekday: 'long' });
-        const normalizedDay = ORDERED_ARABIC_DAYS.find(d => 
-            dayName.includes(d) || d.includes(dayName)
-        ) || dayName;
+        const daysOfWeekArabic = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        const normalizedDay = daysOfWeekArabic[jsDate.getDay()];
 
         const scheduledDay = weeklySchedule.find(s => s.day === normalizedDay);
         
@@ -247,15 +262,21 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
                             value={attendanceDates}
                             onChange={(dateObjects: DateObject[] | null) => {
                                 setError('');
-                                setAttendanceDates(dateObjects ? dateObjects.map(d => d.format("YYYY-MM-DD")) : []);
+                                setAttendanceDates(dateObjects ? dateObjects.map(d => {
+                                    const formatted = d.format("YYYY-MM-DD");
+                                    const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+                                    return formatted.replace(/[٠-٩]/g, (w: string) => arabicNumbers.indexOf(w).toString());
+                                }) : []);
                             }}
                             format="YYYY-MM-DD"
+                            locale={gregorian_ar}
+                            weekDays={["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"]}
+                            weekStartDayIndex={0}
                             minDate={minDate}
                             maxDate={maxDate}
                             mapDays={mapDays}
-                            placeholder="اختر تواريخ الحضور"
-                            inputClass="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-right"
-                            containerClassName="w-full"
+                            className="custom-calendar"
+                            render={<CustomDatePickerInput />}
                         />
                     </div>
                     {error && (
@@ -264,23 +285,11 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
                         </p>
                     )}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                    {attendanceDates.map(date => (
-                        <div key={date} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full flex items-center gap-2 border border-blue-200">
-                            <span>{new Date(date).toLocaleDateString('ar-EG')}</span>
-                            <button
-                                type="button"
-                                onClick={() => removeAttendanceDate(date)}
-                                className="text-red-500 hover:text-red-700"
-                            >
-                                <X size={16} />
-                            </button>
-                        </div>
-                    ))}
-                    {attendanceDates.length === 0 && (
+                {attendanceDates.length === 0 && (
+                    <div className="mt-2">
                         <p className="text-gray-500 italic">لم يتم إضافة تواريخ بعد</p>
-                    )}
-                </div>
+                    </div>
+                )}
 
                 {attendanceDates.length > 0 && (
                     <div className="mt-6">
@@ -294,22 +303,38 @@ export const InsertForm: React.FC<InsertFormProps> = ({ onSave, onCancel, initia
                                         <th className="border p-2">اليوم</th>
                                         <th className="border p-2">نظري</th>
                                         <th className="border p-2">عملي</th>
+                                        <th className="border p-2">إجراء</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {reportData.attendanceDates.map((att, idx) => (
-                                        <tr key={idx} className="hover:bg-gray-50">
-                                            <td className="border p-2">{displayValueOrDash(att.serial)}</td>
-                                            <td className="border p-2">{displayValueOrDash(att.date)}</td>
-                                            <td className="border p-2">{displayValueOrDash(att.day)}</td>
-                                            <td className="border p-2">{displayValueOrDash(att.theoretical)}</td>
-                                            <td className="border p-2">{displayValueOrDash(att.practical)}</td>
-                                        </tr>
-                                    ))}
+                                    {reportData.attendanceDates.map((att, idx) => {
+                                        const [y, m, d] = att.date.split('-').map(Number);
+                                        const localDate = new Date(y, m - 1, d);
+                                        return (
+                                            <tr key={idx} className="hover:bg-gray-50">
+                                                <td className="border p-2">{displayValueOrDash(att.serial)}</td>
+                                                <td className="border p-2">{localDate.toLocaleDateString('ar-EG')}</td>
+                                                <td className="border p-2">{displayValueOrDash(att.day)}</td>
+                                                <td className="border p-2">{displayValueOrDash(att.theoretical)}</td>
+                                                <td className="border p-2">{displayValueOrDash(att.practical)}</td>
+                                                <td className="border p-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeAttendanceDate(att.date)}
+                                                        className="text-red-500 hover:text-red-700 flex justify-center w-full"
+                                                        title="حذف"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                     <tr className="bg-gray-50 font-bold">
                                         <td colSpan={3} className="border p-2 text-left">إجمالي الساعات الفعلية</td>
                                         <td className="border p-2">{displayValueOrDash(reportData.totalTheoreticalHoursAttendance)}</td>
                                         <td className="border p-2">{displayValueOrDash(reportData.totalPracticalHoursAttendance)}</td>
+                                        <td className="border p-2"></td>
                                     </tr>
                                 </tbody>
                             </table>

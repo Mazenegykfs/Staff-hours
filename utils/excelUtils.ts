@@ -94,6 +94,21 @@ export const importRecordsFromExcel = (file: File): Promise<Partial<StaffRecord>
                         } catch (e) {}
                     }
 
+                    // Filter attendance dates to ensure they match the weekly schedule
+                    const validAttendanceDates = parsedAttendanceDates.filter(dateStr => {
+                        try {
+                            const [year, month, day] = dateStr.split('-').map(Number);
+                            const jsDate = new Date(year, month - 1, day);
+                            const daysOfWeekArabic = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+                            const normalizedDay = daysOfWeekArabic[jsDate.getDay()];
+                            
+                            const scheduledDay = parsedWeeklySchedule.find((s: any) => s.day === normalizedDay);
+                            return scheduledDay && (scheduledDay.theoretical > 0 || scheduledDay.practical > 0);
+                        } catch (e) {
+                            return false;
+                        }
+                    });
+
                     return {
                         id: item['ID'] || undefined,
                         uid: item['UID'] || undefined,
@@ -102,7 +117,7 @@ export const importRecordsFromExcel = (file: File): Promise<Partial<StaffRecord>
                         department: item['القسم'] || '',
                         employer: item['جهة العمل'] || '',
                         weeklySchedule: parsedWeeklySchedule,
-                        attendanceDates: parsedAttendanceDates
+                        attendanceDates: validAttendanceDates
                     };
                 });
 

@@ -44,13 +44,20 @@ export const computeReportData = (record: StaffRecord) => {
     const totalScheduledTheoreticalHours = record.weeklySchedule.reduce((sum, s) => sum + (Number(s.theoretical) || 0), 0);
     const totalScheduledPracticalHours = record.weeklySchedule.reduce((sum, s) => sum + (Number(s.practical) || 0), 0);
 
-    const daysOfWeekArabic = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const daysOfWeekArabic = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
     
     let totalTheoreticalHoursAttendance = 0;
     let totalPracticalHoursAttendance = 0;
 
+    const arabicToEnglish = (str: string) => {
+        const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+        return str.replace(/[٠-٩]/g, w => arabicNumbers.indexOf(w).toString());
+    };
+
     const attendanceDatesProcessed = record.attendanceDates.map((dateStr, index) => {
-        const dateObj = new Date(dateStr);
+        const englishDateStr = arabicToEnglish(dateStr);
+        const [year, month, day] = englishDateStr.split('-').map(Number);
+        const dateObj = new Date(year, month - 1, day);
         const dayOfWeekIndex = dateObj.getDay();
         const dayName = daysOfWeekArabic[dayOfWeekIndex];
         
@@ -63,7 +70,7 @@ export const computeReportData = (record: StaffRecord) => {
 
         return {
             serial: index + 1,
-            date: dateStr,
+            date: englishDateStr,
             day: dayName,
             theoretical,
             practical
@@ -75,7 +82,9 @@ export const computeReportData = (record: StaffRecord) => {
     let attendanceYearEnd = '';
     
     if (record.attendanceDates.length > 0) {
-        const firstDate = new Date(record.attendanceDates[0]);
+        const englishDateStr = arabicToEnglish(record.attendanceDates[0]);
+        const [yearStr, monthStr, dayStr] = englishDateStr.split('-');
+        const firstDate = new Date(Number(yearStr), Number(monthStr) - 1, Number(dayStr));
         const monthsArabic = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
         attendanceMonth = monthsArabic[firstDate.getMonth()];
         const year = firstDate.getFullYear();
